@@ -7,7 +7,7 @@
 <style>
 body {
 font-family: sans-serif;
-background-color: #f1f5f9; /* A light slate color */
+background-color: #f1f59; /* A light slate color */
 display: flex;
 justify-content: center;
 align-items: center;
@@ -64,7 +64,7 @@ opacity: 0.5;
      opacity: 0.5;
 }    
 
-    
+
     /* Style for the 'Click Me' button */
 #click-button {
 position: absolute;
@@ -96,6 +96,14 @@ font-size: 25px;
 #spend-button-1000 {
 background-color: green;
 display: none;
+font-family: lemon-milk;
+font-size: 25px;
+}
+
+/* Style for the new 10000 clicks button */
+#spend-button-10000 {
+background-color: orange; /* Example color */
+display: none; /* Initially hidden */
 font-family: lemon-milk;
 font-size: 25px;
 }
@@ -134,6 +142,7 @@ max-width: 448px;
 box-sizing: border-box;
 text-align: center;
 size-adjust false;
+}
 </style>
 </head>
 <body>
@@ -161,6 +170,10 @@ Spend 100 Clicks
 <button class="upgrade-button" id="spend-button-1000">
 Spend 1000 Clicks
 </button>
+
+<button class="upgrade-button" id="spend-button-10000">
+Spend 10000 Clicks
+</button>
 </div>
 <script>
 // Get button elements
@@ -168,6 +181,8 @@ const clickButton = document.getElementById('click-button');
 const spendButton = document.getElementById('spend-button');
 const spendButton100 = document.getElementById('spend-button-100');
 const spendButton1000 = document.getElementById('spend-button-1000');
+const spendButton10000 = document.getElementById('spend-button-10000'); // New button element
+
 // Get the counter element
 const counterElement = document.getElementById('counter');
 const bonusElement = document.getElementById('bonus');
@@ -177,9 +192,12 @@ let counterValue = {{ clicks if clicks is defined else 0 }};
 let bonusValue = {{ click_bonus if click_bonus is defined else 1 }};
 let hasUnlocked100 = {{ has_unlocked_100|tojson }};
 let hasUnlocked1000 = {{ has_unlocked_1000|tojson }};
+let hasUnlocked10000 = {{ has_unlocked_10000|tojson }}; // New state variable
+
 const SPEND_AMOUNT = 10; // Define how many clicks are spent
 const SPEND_AMOUNT_100 = 100; // Define how many clicks for the 100 upgrade
 const SPEND_AMOUNT_1000 = 1000; // Define how many clicks for the 1000 upgrade
+const SPEND_AMOUNT_10000 = 10000; // Define clicks for the new upgrade
 
 // Update the display with saved clicks
 counterElement.textContent = counterValue;
@@ -193,33 +211,47 @@ function updateButtonStates() {
     } else {
         spendButton.classList.add('disabled');
     }
-    
+
     // Update spend 100 button
     if (counterValue >= SPEND_AMOUNT_100) {
         spendButton100.classList.remove('disabled');
     } else {
         spendButton100.classList.add('disabled');
     }
-    
+
     // Update spend 1000 button
     if (counterValue >= SPEND_AMOUNT_1000) {
         spendButton1000.classList.remove('disabled');
     } else {
         spendButton1000.classList.add('disabled');
     }
-    
+
+    // Update spend 10000 button
+    if (counterValue >= SPEND_AMOUNT_10000) {
+        spendButton10000.classList.remove('disabled');
+    } else {
+        spendButton10000.classList.add('disabled');
+    }
+
     // Show/hide the 100 clicks button based on unlock status
     if (hasUnlocked100) {
         spendButton100.style.display = 'flex';
     } else {
         spendButton100.style.display = 'none';
     }
-    
+
     // Show/hide the 1000 clicks button based on unlock status
     if (hasUnlocked1000) {
         spendButton1000.style.display = 'flex';
     } else {
         spendButton1000.style.display = 'none';
+    }
+
+    // Show/hide the 10000 clicks button based on unlock status
+    if (hasUnlocked10000) {
+        spendButton10000.style.display = 'flex';
+    } else {
+        spendButton10000.style.display = 'none';
     }
 }
 
@@ -256,7 +288,10 @@ hasUnlocked100 = data.has_unlocked_100;
 if (data.has_unlocked_1000 !== undefined) {
 hasUnlocked1000 = data.has_unlocked_1000;
 }
-updateButtonStates();
+if (data.has_unlocked_10000 !== undefined) {
+                hasUnlocked10000 = data.has_unlocked_10000;
+            }
+            updateButtonStates();
 } else {
 console.error(`Failed to perform action at ${endpoint}`);
 // Fallback: try to update locally if server fails
@@ -312,6 +347,15 @@ if (counterValue >= SPEND_AMOUNT_1000) {
 sendClickAction('/spend_clicks_1000', -SPEND_AMOUNT_1000); // -1000 clicks locally on error
 } else {
 showMessage(`You need ${SPEND_AMOUNT_1000} clicks to use this!`);
+}
+});
+
+// 5. Spend 10000 clicks listener (New functionality)
+spendButton10000.addEventListener('click', () => {
+if (counterValue >= SPEND_AMOUNT_10000) {
+sendClickAction('/spend_clicks_10000', -SPEND_AMOUNT_10000); // -10000 clicks locally on error
+} else {
+showMessage(`You need ${SPEND_AMOUNT_10000} clicks to use this!`);
 }
 });
 
