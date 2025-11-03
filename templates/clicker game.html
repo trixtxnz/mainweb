@@ -182,7 +182,6 @@ Clicks: <span id="counter">0</span> | Clicks per click: <span id="bonus">1</span
 {% if username %}
 <p style="font-size: 16px; margin: 5px 0;">Welcome, {{ username }}! <a href="/logout" style="color: #ffcccc;">Logout</a></p>
 {% endif %}
-    <a href="{{ url_for('website') }}"style="color: #ffcccc;">Back to Website</a>
 </div>
 
 <div id="message-display" style="position: absolute; top: 40%; left: 50%; transform: translateX(-50%); font-size: 18px; color: red; font-weight: bold; min-height: 20px; text-align: center; background-color: lightslategray(255, 255, 255, 0.9); padding: 10px 20px; border-radius: 8px;"></div>
@@ -193,23 +192,23 @@ Click
 <div id="hand">👆</div>
 <div class='ui-box'>
 <button class="upgrade-button" id="spend-button">
-+1 clicks (10 Clicks)
+Spend 10 Clicks
 </button>
 
 <button class="upgrade-button" id="spend-button-100">
-+10 clicks (100 Clicks)
+Spend 100 Clicks
 </button>
 
 <button class="upgrade-button" id="spend-button-1000">
-+100 clicks (1000 Clicks)
+Spend 1000 Clicks
 </button>
 
 <button class="upgrade-button" id="spend-button-10000">
-+1000 clicks (10000 Clicks)
+Spend 10000 Clicks
 </button>
 
 <button class="upgrade-button" id="unlock-auto-clicker-button" style="background-color: gold;">
-Auto-Clicker (15000 clicks)
+Unlock Auto-Clicker (15000 clicks)
 </button>
 </div>
 <script>

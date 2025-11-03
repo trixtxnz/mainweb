@@ -546,8 +546,8 @@ def unlock_auto_clicker():
     })
 
 
-if 'has_unlocked_1000' not in users[username]:
-    users[username]['has_unlocked_1000'] = False
+    if 'has_unlocked_1000' not in users[username]:
+        users[username]['has_unlocked_1000'] = False
 
     current_clicks = users[username]['clicks']
     
