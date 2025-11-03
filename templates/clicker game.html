@@ -208,7 +208,7 @@ Spend 10000 Clicks
 </button>
 
 <button class="upgrade-button" id="unlock-auto-clicker-button" style="background-color: gold;">
-Unlock Auto-Clicker
+Unlock Auto-Clicker (15000 clicks)
 </button>
 </div>
 <script>
@@ -236,6 +236,7 @@ const SPEND_AMOUNT = 10; // Define how many clicks are spent
 const SPEND_AMOUNT_100 = 100; // Define how many clicks for the 100 upgrade
 const SPEND_AMOUNT_1000 = 1000; // Define how many clicks for the 1000 upgrade
 const SPEND_AMOUNT_10000 = 10000; // Define clicks for the new upgrade
+const SPEND_AMOUNT_AUTO_CLICKER = 15000; // Cost to unlock auto-clicker
 
 // Update the display with saved clicks
 counterElement.textContent = counterValue;
@@ -295,7 +296,11 @@ function updateButtonStates() {
     // Show/hide the auto-clicker unlock button
     if (hasUnlocked10000 && !hasAutoClicker) {
         unlockAutoClickerButton.style.display = 'flex';
-        unlockAutoClickerButton.classList.remove('disabled');
+        if (counterValue >= SPEND_AMOUNT_AUTO_CLICKER) {
+            unlockAutoClickerButton.classList.remove('disabled');
+        } else {
+            unlockAutoClickerButton.classList.add('disabled');
+        }
     } else {
         unlockAutoClickerButton.style.display = 'none';
     }
@@ -407,6 +412,11 @@ showMessage(`You need ${SPEND_AMOUNT_10000} clicks to use this!`);
 
 // 6. Unlock auto-clicker listener
 unlockAutoClickerButton.addEventListener('click', async () => {
+    if (counterValue < SPEND_AMOUNT_AUTO_CLICKER) {
+        showMessage(`You need ${SPEND_AMOUNT_AUTO_CLICKER} clicks to unlock the auto-clicker!`);
+        return;
+    }
+    
     try {
         const response = await fetch('/unlock_auto_clicker', {
             method: 'POST',
@@ -417,6 +427,10 @@ unlockAutoClickerButton.addEventListener('click', async () => {
 
         if (response.ok) {
             const data = await response.json();
+            if (data.clicks !== undefined) {
+                counterValue = data.clicks;
+                counterElement.textContent = counterValue;
+            }
             if (data.has_auto_clicker !== undefined) {
                 hasAutoClicker = data.has_auto_clicker;
                 if (hasAutoClicker && !autoClickInterval) {

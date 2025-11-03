@@ -496,17 +496,23 @@ def unlock_auto_clicker():
     # 2. Load User Data
     users = load_users()
     username = session['username']
+    SPEND_AMOUNT = 15000  # Cost to unlock auto-clicker
 
     # Initialize if not present
+    if 'clicks' not in users[username]:
+        users[username]['clicks'] = 0
     if 'has_unlocked_10000' not in users[username]:
         users[username]['has_unlocked_10000'] = False
     if 'has_auto_clicker' not in users[username]:
         users[username]['has_auto_clicker'] = False
 
+    current_clicks = users[username]['clicks']
+
     # 3. Validation Check: Must have unlocked the 10000 upgrade first
     if not users[username]['has_unlocked_10000']:
         return jsonify({
             'error': 'You must unlock the 10000 upgrade first.',
+            'clicks': current_clicks,
             'has_auto_clicker': users[username]['has_auto_clicker']
         }), 403
 
@@ -514,17 +520,28 @@ def unlock_auto_clicker():
     if users[username]['has_auto_clicker']:
         return jsonify({
             'error': 'Auto-clicker already unlocked.',
+            'clicks': current_clicks,
             'has_auto_clicker': True
         }), 400
 
-    # 5. Unlock the auto-clicker
+    # 5. Validation Check: Must have enough clicks
+    if current_clicks < SPEND_AMOUNT:
+        return jsonify({
+            'error': f'Insufficient clicks. Need {SPEND_AMOUNT}, have {current_clicks}.',
+            'clicks': current_clicks,
+            'has_auto_clicker': users[username]['has_auto_clicker']
+        }), 400
+
+    # 6. Deduct clicks and unlock the auto-clicker
+    users[username]['clicks'] -= SPEND_AMOUNT
     users[username]['has_auto_clicker'] = True
 
     # Save the updated data
     save_users(users)
 
-    # 6. Success Response
+    # 7. Success Response
     return jsonify({
+        'clicks': users[username]['clicks'],
         'has_auto_clicker': users[username]['has_auto_clicker']
     })
 
