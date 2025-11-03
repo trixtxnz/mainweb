@@ -43,7 +43,7 @@
   "tri": {
     "password": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
     "gender": "male",
-    "clicks": 31291664,
+    "clicks": 74213801,
     "prefs": {
       "welcome_text": "Welcome to the website made by your ideas!",
       "bg_color": "#ff00ea",
@@ -51,7 +51,7 @@
       "font_size": "31",
       "bg_image": "tri_bg.webp"
     },
-    "click_bonus": 310524,
+    "click_bonus": 316680,
     "has_unlocked_100": true,
     "has_unlocked_1000": true,
     "has_unlocked_10000": true,
@@ -118,8 +118,8 @@
   "tristen3": {
     "password": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
     "gender": "male",
-    "clicks": 9506390,
-    "click_bonus": 92295,
+    "clicks": 30605520,
+    "click_bonus": 103295,
     "has_unlocked_100": true,
     "has_unlocked_1000": true,
     "has_unlocked_10000": true,
