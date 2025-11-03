@@ -130,6 +130,14 @@ font-family: lemon-milk;
 font-size: 25px;
 }
 
+/* Style for the auto-clicker unlock button */
+#unlock-auto-clicker-button {
+background-color: gold;
+display: none; /* Initially hidden */
+font-family: lemon-milk;
+font-size: 25px;
+}
+
 .circle-button:hover:not(.disabled) {
 filter: brightness(0.9); /* Darken slightly on hover for both */
 }
@@ -198,6 +206,10 @@ Spend 1000 Clicks
 <button class="upgrade-button" id="spend-button-10000">
 Spend 10000 Clicks
 </button>
+
+<button class="upgrade-button" id="unlock-auto-clicker-button" style="background-color: gold;">
+Unlock Auto-Clicker
+</button>
 </div>
 <script>
 // Get button elements
@@ -206,6 +218,7 @@ const spendButton = document.getElementById('spend-button');
 const spendButton100 = document.getElementById('spend-button-100');
 const spendButton1000 = document.getElementById('spend-button-1000');
 const spendButton10000 = document.getElementById('spend-button-10000'); // New button element
+const unlockAutoClickerButton = document.getElementById('unlock-auto-clicker-button');
 
 // Get the counter element
 const counterElement = document.getElementById('counter');
@@ -278,6 +291,14 @@ function updateButtonStates() {
     } else {
         spendButton10000.style.display = 'none';
     }
+
+    // Show/hide the auto-clicker unlock button
+    if (hasUnlocked10000 && !hasAutoClicker) {
+        unlockAutoClickerButton.style.display = 'flex';
+        unlockAutoClickerButton.classList.remove('disabled');
+    } else {
+        unlockAutoClickerButton.style.display = 'none';
+    }
 }
 
 // Initial button state update
@@ -315,12 +336,6 @@ hasUnlocked1000 = data.has_unlocked_1000;
 }
 if (data.has_unlocked_10000 !== undefined) {
                 hasUnlocked10000 = data.has_unlocked_10000;
-            }
-            if (data.has_auto_clicker !== undefined) {
-                hasAutoClicker = data.has_auto_clicker;
-                if (hasAutoClicker && !autoClickInterval) {
-                    startAutoClicker();
-                }
             }
             updateButtonStates();
 } else {
@@ -388,6 +403,36 @@ sendClickAction('/spend_clicks_10000', -SPEND_AMOUNT_10000); // -10000 clicks lo
 } else {
 showMessage(`You need ${SPEND_AMOUNT_10000} clicks to use this!`);
 }
+});
+
+// 6. Unlock auto-clicker listener
+unlockAutoClickerButton.addEventListener('click', async () => {
+    try {
+        const response = await fetch('/unlock_auto_clicker', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            if (data.has_auto_clicker !== undefined) {
+                hasAutoClicker = data.has_auto_clicker;
+                if (hasAutoClicker && !autoClickInterval) {
+                    startAutoClicker();
+                }
+                updateButtonStates();
+                showMessage('Auto-clicker unlocked!');
+            }
+        } else {
+            const errorData = await response.json();
+            showMessage(errorData.error || 'Failed to unlock auto-clicker');
+        }
+    } catch (error) {
+        console.error('Error unlocking auto-clicker:', error);
+        showMessage('Error unlocking auto-clicker');
+    }
 });
 
 // --- Auto-clicker Hand Animation ---

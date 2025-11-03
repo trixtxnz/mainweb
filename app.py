@@ -486,6 +486,49 @@ def spend_clicks_1000():
         users[username]['clicks'] = 0
     if 'click_bonus' not in users[username]:
         users[username]['click_bonus'] = 1
+
+@app.route('/unlock_auto_clicker', methods=['POST'])
+def unlock_auto_clicker():
+    # 1. Authentication Check
+    if 'username' not in session:
+        return jsonify({'error': 'Not logged in'}), 401
+
+    # 2. Load User Data
+    users = load_users()
+    username = session['username']
+
+    # Initialize if not present
+    if 'has_unlocked_10000' not in users[username]:
+        users[username]['has_unlocked_10000'] = False
+    if 'has_auto_clicker' not in users[username]:
+        users[username]['has_auto_clicker'] = False
+
+    # 3. Validation Check: Must have unlocked the 10000 upgrade first
+    if not users[username]['has_unlocked_10000']:
+        return jsonify({
+            'error': 'You must unlock the 10000 upgrade first.',
+            'has_auto_clicker': users[username]['has_auto_clicker']
+        }), 403
+
+    # 4. Check if already unlocked
+    if users[username]['has_auto_clicker']:
+        return jsonify({
+            'error': 'Auto-clicker already unlocked.',
+            'has_auto_clicker': True
+        }), 400
+
+    # 5. Unlock the auto-clicker
+    users[username]['has_auto_clicker'] = True
+
+    # Save the updated data
+    save_users(users)
+
+    # 6. Success Response
+    return jsonify({
+        'has_auto_clicker': users[username]['has_auto_clicker']
+    })
+
+
     if 'has_unlocked_1000' not in users[username]:
         users[username]['has_unlocked_1000'] = False
 
@@ -583,9 +626,6 @@ def spend_clicks_10000():
 
         # Increase the click bonus by 1000 (massive upgrade)
         users[username]['click_bonus'] += 1000
-        
-        # Unlock the auto-clicker
-        users[username]['has_auto_clicker'] = True
 
         # Save the updated data
         save_users(users)
@@ -596,8 +636,7 @@ def spend_clicks_10000():
             'click_bonus': users[username]['click_bonus'],
             'has_unlocked_100': users[username]['has_unlocked_100'],
             'has_unlocked_1000': users[username]['has_unlocked_1000'],
-            'has_unlocked_10000': users[username]['has_unlocked_10000'],
-            'has_auto_clicker': users[username]['has_auto_clicker']
+            'has_unlocked_10000': users[username]['has_unlocked_10000']
         })
 
 if __name__ == '__main__':
