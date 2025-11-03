@@ -244,6 +244,8 @@ def clicker():
         users[username]['has_unlocked_1000'] = False
     if 'has_unlocked_10000' not in users[username]:
         users[username]['has_unlocked_10000'] = False
+    if 'has_auto_clicker' not in users[username]:
+        users[username]['has_auto_clicker'] = False
     save_users(users)
     
     current_clicks = users[username]['clicks']
@@ -251,13 +253,15 @@ def clicker():
     has_unlocked_100 = users[username]['has_unlocked_100']
     has_unlocked_1000 = users[username]['has_unlocked_1000']
     has_unlocked_10000 = users[username]['has_unlocked_10000']
+    has_auto_clicker = users[username]['has_auto_clicker']
     return render_template('clicker game.html',
                                                 username=username,
                                                 clicks=current_clicks, 
                                                 click_bonus=current_bonus, 
                                                 has_unlocked_100=has_unlocked_100, 
                                                 has_unlocked_1000=has_unlocked_1000,
-                                                has_unlocked_10000=has_unlocked_10000)
+                                                has_unlocked_10000=has_unlocked_10000,
+                                                has_auto_clicker=has_auto_clicker)
 
 @app.route('/signup', methods=['POST'])
 def signup():
@@ -291,6 +295,7 @@ def signup():
         'has_unlocked_100': False,
         'has_unlocked_1000': False,
         'has_unlocked_10000': False,
+        'has_auto_clicker': False,
         'prefs': get_default_prefs()
     }
     save_users(users)
@@ -578,6 +583,9 @@ def spend_clicks_10000():
 
         # Increase the click bonus by 1000 (massive upgrade)
         users[username]['click_bonus'] += 1000
+        
+        # Unlock the auto-clicker
+        users[username]['has_auto_clicker'] = True
 
         # Save the updated data
         save_users(users)
@@ -588,7 +596,8 @@ def spend_clicks_10000():
             'click_bonus': users[username]['click_bonus'],
             'has_unlocked_100': users[username]['has_unlocked_100'],
             'has_unlocked_1000': users[username]['has_unlocked_1000'],
-            'has_unlocked_10000': users[username]['has_unlocked_10000']
+            'has_unlocked_10000': users[username]['has_unlocked_10000'],
+            'has_auto_clicker': users[username]['has_auto_clicker']
         })
 
 if __name__ == '__main__':
