@@ -528,70 +528,70 @@ def spend_clicks_1000():
         'has_unlocked_1000': users[username]['has_unlocked_1000'],
         'has_unlocked_10000': users[username]['has_unlocked_10000']
     })
-    
+@app.route('/spend_clicks_10000', methods=['POST'])
+def spend_clicks_10000():
+        # 1. Authentication Check
+        if 'username' not in session:
+            return jsonify({'error': 'Not logged in'}), 401
+
+        # 2. Load User Data and Get Variables
+        users = load_users()
+        username = session['username']
+        SPEND_AMOUNT = 10000  # Must match the SPEND_AMOUNT_10000 in JavaScript
+
+        # Initialize clicks and bonus if not present (Safety check)
+        if 'clicks' not in users[username]:
+            users[username]['clicks'] = 0
+        if 'click_bonus' not in users[username]:
+            users[username]['click_bonus'] = 1
+        if 'has_unlocked_10000' not in users[username]:
+            users[username]['has_unlocked_10000'] = False
+
+        current_clicks = users[username]['clicks']
+
+        # 3. Validation Check: Must have unlocked this upgrade first
+        if not users[username]['has_unlocked_10000']:
+            return jsonify({
+                'error': 'You must unlock this upgrade first by buying the 1000 clicks upgrade.',
+                'clicks': current_clicks,
+                'click_bonus': users[username]['click_bonus'],
+                'has_unlocked_100': users[username]['has_unlocked_100'],
+                'has_unlocked_1000': users[username]['has_unlocked_1000'],
+                'has_unlocked_10000': users[username]['has_unlocked_10000']
+            }), 403
+
+        # 4. Validation Check (CRITICAL: Server is the authority)
+        if current_clicks < SPEND_AMOUNT:
+            return jsonify({
+                'error': f'Insufficient clicks. Need {SPEND_AMOUNT}, have {current_clicks}.',
+                'clicks': current_clicks,
+                'click_bonus': users[username]['click_bonus'],
+                'has_unlocked_100': users[username]['has_unlocked_100'],
+                'has_unlocked_1000': users[username]['has_unlocked_1000'],
+                'has_unlocked_10000': users[username]['has_unlocked_10000']
+            }), 400
+
+        # 5. Process the Transaction
+
+        # Decrement click count
+        users[username]['clicks'] -= SPEND_AMOUNT
+
+        # Increase the click bonus by 1000 (massive upgrade)
+        users[username]['click_bonus'] += 1000
+
+        # Save the updated data
+        save_users(users)
+
+        # 6. Success Response
+        return jsonify({
+            'clicks': users[username]['clicks'],
+            'click_bonus': users[username]['click_bonus'],
+            'has_unlocked_100': users[username]['has_unlocked_100'],
+            'has_unlocked_1000': users[username]['has_unlocked_1000'],
+            'has_unlocked_10000': users[username]['has_unlocked_10000']
+        })
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
 
 
-@app.route('/spend_clicks_10000', methods=['POST'])
-def spend_clicks_10000():
-    # 1. Authentication Check
-    if 'username' not in session:
-        return jsonify({'error': 'Not logged in'}), 401
-
-    # 2. Load User Data and Get Variables
-    users = load_users()
-    username = session['username']
-    SPEND_AMOUNT = 10000  # Must match the SPEND_AMOUNT_10000 in JavaScript
-
-    # Initialize clicks and bonus if not present (Safety check)
-    if 'clicks' not in users[username]:
-        users[username]['clicks'] = 0
-    if 'click_bonus' not in users[username]:
-        users[username]['click_bonus'] = 1
-    if 'has_unlocked_10000' not in users[username]:
-        users[username]['has_unlocked_10000'] = False
-
-    current_clicks = users[username]['clicks']
-    
-    # 3. Validation Check: Must have unlocked this upgrade first
-    if not users[username]['has_unlocked_10000']:
-        return jsonify({
-            'error': 'You must unlock this upgrade first by buying the 1000 clicks upgrade.',
-            'clicks': current_clicks,
-            'click_bonus': users[username]['click_bonus'],
-            'has_unlocked_100': users[username]['has_unlocked_100'],
-            'has_unlocked_1000': users[username]['has_unlocked_1000'],
-            'has_unlocked_10000': users[username]['has_unlocked_10000']
-        }), 403
-
-    # 4. Validation Check (CRITICAL: Server is the authority)
-    if current_clicks < SPEND_AMOUNT:
-        return jsonify({
-            'error': f'Insufficient clicks. Need {SPEND_AMOUNT}, have {current_clicks}.',
-            'clicks': current_clicks,
-            'click_bonus': users[username]['click_bonus'],
-            'has_unlocked_100': users[username]['has_unlocked_100'],
-            'has_unlocked_1000': users[username]['has_unlocked_1000'],
-            'has_unlocked_10000': users[username]['has_unlocked_10000']
-        }), 400
-
-    # 5. Process the Transaction
-
-    # Decrement click count
-    users[username]['clicks'] -= SPEND_AMOUNT
-    
-    # Increase the click bonus by 1000 (massive upgrade)
-    users[username]['click_bonus'] += 1000
-
-    # Save the updated data
-    save_users(users)
-
-    # 6. Success Response
-    return jsonify({
-        'clicks': users[username]['clicks'],
-        'click_bonus': users[username]['click_bonus'],
-        'has_unlocked_100': users[username]['has_unlocked_100'],
-        'has_unlocked_1000': users[username]['has_unlocked_1000'],
-        'has_unlocked_10000': users[username]['has_unlocked_10000']
-    })

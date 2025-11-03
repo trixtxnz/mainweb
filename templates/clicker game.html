@@ -33,6 +33,12 @@ text-shadow : 0 0 9px rgba(9, 9, 9, 9.5);
 padding: 5px;
 transition: all 0.3s ease;
 font-family: lemon-milk;
+    transition: transform 0.1s ease;
+    }
+
+    button:active {
+      transform: scale(0.95); /* Creates a "pressed" effect */
+      background-color: red; /* Slightly darker shade */
 }
 
 .circle-button.disabled {
@@ -143,6 +149,7 @@ box-sizing: border-box;
 text-align: center;
 size-adjust false;
 }
+    
 </style>
 </head>
 <body>

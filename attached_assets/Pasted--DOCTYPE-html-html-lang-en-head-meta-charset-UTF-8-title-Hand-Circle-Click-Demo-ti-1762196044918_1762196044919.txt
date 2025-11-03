@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Hand Circle Click Demo</title>
+<style>
+body {
+font-family: sans-serif;
+background-color: #f1f59; /* A light slate color */
+display: flex;
+justify-content: center;
+align-items: center;
+min-height: 100vh;
+margin: 0;
+padding: 20px;
+}
+
+.circle-button {
+width: 100px; /* Adjust size */
+height: 100px; /* Adjust size */
+background-color: red; /* Red color */
+border: none; /* Remove border */
+border-radius: 50%; /* Make it circular */
+color: white; /* Text color */
+cursor: pointer; /* Pointer on hover */
+display: flex;
+justify-content: center;
+align-items: center;
+text-align: center;
+font-size: 25px;
+text-shadow : 0 0 9px rgba(9, 9, 9, 9.5);
+padding: 5px;
+transition: all 0.3s ease;
+font-family: lemon-milk;
+transition: transform 0.1s ease;
+}
+
+/* The animated hand circle */
+#hand {
+position: absolute;
+width: 40px;
+height: 40px;
+border-radius: 50%;
+background: rgba(255, 200, 0, 0.6);
+display: flex;
+align-items: center;
+justify-content: center;
+font-size: 20px;
+pointer-events: none; /* Don't block clicks */
+z-index: 0;
+        /* Add rotation properties here for smooth pointing */
+        transform-origin: center;
+        transition: transform 0.05s linear;
+}
+</style>
+</head>
+<body>
+
+<button id="circle-button" class="circle-button">Click Me</button>
+<div id="hand">👆</div>
+
+<script>
+(function() {
+const button = document.getElementById("circle-button");
+const hand = document.getElementById("hand");
+
+if (!button || !hand) {
+console.error("Required elements not found.");
+return;
+}
+
+// Get button position
+const rect = button.getBoundingClientRect();
+const centerX = rect.left + rect.width / 2 + window.scrollX;
+const centerY = rect.top + rect.height / 2 + window.scrollY;
+
+let angle = 0;
+const radius = 80; // Distance from button center
+const speed = 0.05; // Radians per frame
+
+// Animate the hand in a circle
+function animate() {
+angle += speed;
+const x = centerX + radius * Math.cos(angle) - hand.offsetWidth / 2;
+const y = centerY + radius * Math.sin(angle) - hand.offsetHeight / 2;
+hand.style.left = `${x}px`;
+hand.style.top = `${y}px`;
+
+        // --- START: Added logic to make the hand point at the center ---
+        // 1. Calculate the rotation in radians. The hand must be rotated 
+        //    relative to its orbital angle, minus 90 degrees (Math.PI / 2) 
+        //    because the '👆' emoji points straight up by default.
+        const rotationRad = angle - Math.PI / 2; 
+
+        // 2. Convert radians to degrees for the CSS transform
+        const rotationDeg = rotationRad * (180 / Math.PI);
+
+        // 3. Apply the CSS transform property
+        hand.style.transform = `rotate(${rotationDeg}deg)`;
+        // --- END: Added logic ---
+
+requestAnimationFrame(animate);
+}
+animate();
+
+// Simulate a click every second
+const clickInterval = setInterval(() => {
+if (document.body.contains(button)) {
+button.click();
+} else {
+clearInterval(clickInterval);
+console.warn("Button removed, stopping clicks.");
+}
+}, 1000);
+
+// Example click handler
+button.addEventListener("click", () => {
+console.log("Button clicked at", new Date().toLocaleTimeString());
+});
+})();
+</script>
+
+</body>
+</html>
