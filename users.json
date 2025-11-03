@@ -43,7 +43,7 @@
   "tri": {
     "password": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
     "gender": "male",
-    "clicks": 10874556,
+    "clicks": 31291664,
     "prefs": {
       "welcome_text": "Welcome to the website made by your ideas!",
       "bg_color": "#ff00ea",
@@ -51,10 +51,11 @@
       "font_size": "31",
       "bg_image": "tri_bg.webp"
     },
-    "click_bonus": 300524,
+    "click_bonus": 310524,
     "has_unlocked_100": true,
     "has_unlocked_1000": true,
-    "has_unlocked_10000": true
+    "has_unlocked_10000": true,
+    "has_auto_clicker": true
   },
   "hayden": {
     "password": "caa910d6e038351c1f24ab5b4e02320ba7b1a604c705087ece568eccde682b99",
@@ -113,5 +114,22 @@
       "bg_image": null
     },
     "has_unlocked_10000": true
+  },
+  "tristen3": {
+    "password": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+    "gender": "male",
+    "clicks": 125575,
+    "click_bonus": 1182,
+    "has_unlocked_100": true,
+    "has_unlocked_1000": true,
+    "has_unlocked_10000": true,
+    "has_auto_clicker": true,
+    "prefs": {
+      "welcome_text": "Welcome to the website made by your ideas!",
+      "bg_color": "#f5f5f5",
+      "text_color": "#333333",
+      "font_size": "16",
+      "bg_image": null
+    }
   }
 }
