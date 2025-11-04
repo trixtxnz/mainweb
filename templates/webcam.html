@@ -106,7 +106,7 @@
     <div class="info-box">
         <h3>✅ Server-Side Detection</h3>
         <p><strong>This works in Replit workspace!</strong> Frames are sent to the Python backend for processing using OpenCV.</p>
-        <p>Currently detecting: <strong>Faces</strong> (using Haar Cascade classifier)</p>
+        <p>Currently detecting: <strong>Faces & Hands</strong> (using Haar Cascade classifiers)</p>
         <p>Click "Toggle Detection" to start/stop object detection.</p>
     </div>
 
@@ -245,13 +245,23 @@
 
                 // Draw detection boxes
                 if (result.detections && result.detections.length > 0) {
-                    ctx.strokeStyle = '#10b981';
                     ctx.lineWidth = 3;
                     ctx.font = '16px sans-serif';
-                    ctx.fillStyle = '#10b981';
 
                     result.detections.forEach(detection => {
                         const { x, y, width, height } = detection.box;
+                        
+                        // Use different colors for different objects
+                        if (detection.label === 'Face') {
+                            ctx.strokeStyle = '#10b981'; // green for faces
+                            ctx.fillStyle = '#10b981';
+                        } else if (detection.label === 'Hand') {
+                            ctx.strokeStyle = '#f59e0b'; // orange for hands
+                            ctx.fillStyle = '#f59e0b';
+                        } else {
+                            ctx.strokeStyle = '#3b82f6'; // blue for other objects
+                            ctx.fillStyle = '#3b82f6';
+                        }
                         
                         // Draw rectangle
                         ctx.strokeRect(x, y, width, height);
@@ -261,9 +271,21 @@
                         ctx.fillText(label, x, y - 5);
                     });
 
-                    detectionInfo.textContent = `Detected ${result.count} face(s)`;
+                    // Count faces and hands separately
+                    const faceCount = result.detections.filter(d => d.label === 'Face').length;
+                    const handCount = result.detections.filter(d => d.label === 'Hand').length;
+                    
+                    let message = '';
+                    if (faceCount > 0 && handCount > 0) {
+                        message = `Detected ${faceCount} face(s) and ${handCount} hand(s)`;
+                    } else if (faceCount > 0) {
+                        message = `Detected ${faceCount} face(s)`;
+                    } else if (handCount > 0) {
+                        message = `Detected ${handCount} hand(s)`;
+                    }
+                    detectionInfo.textContent = message;
                 } else {
-                    detectionInfo.textContent = 'No faces detected';
+                    detectionInfo.textContent = 'No faces or hands detected';
                 }
 
             } catch (error) {

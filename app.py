@@ -163,6 +163,15 @@ def detect_objects():
         if face_cascade.empty():
             face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
+        # Load hand detector (Haar Cascade)
+        # Note: OpenCV doesn't include a hand cascade by default, so we'll use a workaround
+        # We'll use the fist cascade which can detect hand-like objects
+        hand_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_hand.xml')
+        
+        # If hand cascade not available, try fist detection as alternative
+        if hand_cascade.empty():
+            hand_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_fist.xml')
+
         # Convert to grayscale and enhance image quality
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -173,9 +182,6 @@ def detect_objects():
         gray = cv2.GaussianBlur(gray, (3, 3), 0)
 
         # Detect faces with improved parameters
-        # scaleFactor: smaller = more accurate but slower (1.05-1.1 recommended)
-        # minNeighbors: higher = fewer false positives (5-8 recommended)
-        # minSize: larger = ignore small/distant faces
         faces = face_cascade.detectMultiScale(
             gray, 
             scaleFactor=1.05,      # More thorough scanning
@@ -184,12 +190,38 @@ def detect_objects():
             flags=cv2.CASCADE_SCALE_IMAGE
         )
 
+        # Detect hands (if cascade is available)
+        hands = []
+        if not hand_cascade.empty():
+            hands = hand_cascade.detectMultiScale(
+                gray,
+                scaleFactor=1.1,
+                minNeighbors=4,
+                minSize=(30, 30),
+                flags=cv2.CASCADE_SCALE_IMAGE
+            )
+
         # Prepare detection results
         detections = []
+        
+        # Add face detections
         for (x, y, w, h) in faces:
             detections.append({
                 'label': 'Face',
-                'confidence': 0.95,  # Haar cascades don't provide confidence scores
+                'confidence': 0.95,
+                'box': {
+                    'x': int(x),
+                    'y': int(y),
+                    'width': int(w),
+                    'height': int(h)
+                }
+            })
+        
+        # Add hand detections
+        for (x, y, w, h) in hands:
+            detections.append({
+                'label': 'Hand',
+                'confidence': 0.85,
                 'box': {
                     'x': int(x),
                     'y': int(y),
