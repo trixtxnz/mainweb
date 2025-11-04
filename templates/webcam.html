@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -72,12 +71,12 @@ button:disabled {
 <body>
     <h1>Webcam Object Detection</h1>
     <div id="status">Loading model...</div>
-    
+
     <div id="container">
         <video id="webcam" autoplay playsinline></video>
         <canvas id="canvas"></canvas>
     </div>
-    
+
     <div class="controls">
         <button id="startBtn">Start Webcam & Detection</button>
         <button id="stopBtn">Stop Webcam</button>
@@ -94,7 +93,7 @@ button:disabled {
         const startBtn = document.getElementById('startBtn');
         const stopBtn = document.getElementById('stopBtn');
         const statusDiv = document.getElementById('status');
-        
+
         let stream = null;
         let model = null;
         let animationId = null;
@@ -129,7 +128,7 @@ button:disabled {
             // Draw bounding boxes and labels
             predictions.forEach(prediction => {
                 const [x, y, width, height] = prediction.bbox;
-                
+
                 // Draw bounding box
                 ctx.strokeStyle = '#00ff00';
                 ctx.lineWidth = 3;
@@ -173,13 +172,13 @@ button:disabled {
                     audio: false 
                 });
                 videoElement.srcObject = stream;
-                
+
                 // Wait for video to be ready
                 videoElement.onloadedmetadata = () => {
                     statusDiv.textContent = 'Webcam started. Detecting objects...';
                     detectObjects();
                 };
-                
+
                 startBtn.disabled = true;
                 stopBtn.disabled = false;
             } catch (error) {
