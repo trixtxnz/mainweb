@@ -1,72 +1,73 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Webcam Object Detection</title>
-<style>
-body {
-    font-family: sans-serif;
-    background-color: #f1f5f9;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    margin: 0;
-    padding: 20px;
-}
-h1 {
-    margin-bottom: 20px;
-}
-#container {
-    position: relative;
-    display: inline-block;
-}
-video {
-    border: 2px solid #333;
-    border-radius: 8px;
-    width: 680px;
-    max-width: 100%;
-    display: block;
-}
-#canvas {
-    position: absolute;
-    top: 0;
-    left: 0;
-    border: 2px solid #333;
-    border-radius: 8px;
-    width: 680px;
-    max-width: 100%;
-}
-button {
-    margin-top: 10px;
-    padding: 10px 20px;
-    font-size: 16px;
-    background-color: #4f46e5;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-}
-button:hover {
-    background-color: #4338ca;
-}
-button:disabled {
-    background-color: #9ca3af;
-    cursor: not-allowed;
-}
-#status {
-    margin-top: 15px;
-    padding: 10px;
-    background-color: #fff;
-    border-radius: 6px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-.controls {
-    margin-top: 15px;
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webcam Object Detection</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: #f1f5f9;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            margin-bottom: 20px;
+        }
+        #container {
+            position: relative;
+            display: inline-block;
+        }
+        video {
+            border: 2px solid #333;
+            border-radius: 8px;
+            width: 680px;
+            max-width: 100%;
+            display: block;
+        }
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            border: 2px solid #333;
+            border-radius: 8px;
+            width: 680px;
+            max-width: 100%;
+        }
+        button {
+            margin-top: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4f46e5;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #4338ca;
+        }
+        button:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+        #status {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #fff;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .controls {
+            margin-top: 15px;
+        }
+    </style>
 </head>
 <body>
     <h1>Webcam Object Detection</h1>
@@ -81,7 +82,7 @@ button:disabled {
         <button id="startBtn">Start Webcam & Detection</button>
         <button id="stopBtn">Stop Webcam</button>
     </div>
-    <!-- Load TensorFlow.js and COCO-SSD model -->
+
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.11.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3"></script>
 
@@ -97,7 +98,6 @@ button:disabled {
         let model = null;
         let animationId = null;
 
-        // Load the COCO-SSD model
         async function loadModel() {
             try {
                 statusDiv.textContent = 'Loading object detection model...';
@@ -110,35 +110,27 @@ button:disabled {
             }
         }
 
-        // Detect objects in the video feed
         async function detectObjects() {
             if (!model || !stream) return;
 
-            // Make sure canvas matches video dimensions
             canvasElement.width = videoElement.videoWidth;
             canvasElement.height = videoElement.videoHeight;
 
-            // Run detection
             const predictions = await model.detect(videoElement);
 
-            // Clear previous drawings
             ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
-            // Draw bounding boxes and labels
             predictions.forEach(prediction => {
                 const [x, y, width, height] = prediction.bbox;
 
-                // Draw bounding box
                 ctx.strokeStyle = '#00ff00';
                 ctx.lineWidth = 3;
                 ctx.strokeRect(x, y, width, height);
 
-                // Draw label background
                 ctx.fillStyle = '#00ff00';
                 const textWidth = ctx.measureText(prediction.class).width;
                 ctx.fillRect(x, y - 25, textWidth + 10, 25);
 
-                // Draw label text
                 ctx.fillStyle = '#000000';
                 ctx.font = '18px Arial';
                 ctx.fillText(
@@ -148,7 +140,6 @@ button:disabled {
                 );
             });
 
-            // Update status
             if (predictions.length > 0) {
                 const objects = predictions.map(p => p.class).join(', ');
                 statusDiv.textContent = `Detected: ${objects}`;
@@ -156,11 +147,9 @@ button:disabled {
                 statusDiv.textContent = 'No objects detected';
             }
 
-            // Continue detection loop
             animationId = requestAnimationFrame(detectObjects);
         }
 
-        // Start webcam
         startBtn.addEventListener('click', async () => {
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ 
@@ -172,7 +161,6 @@ button:disabled {
                 });
                 videoElement.srcObject = stream;
 
-                // Wait for video to be ready
                 videoElement.onloadedmetadata = () => {
                     statusDiv.textContent = 'Webcam started. Detecting objects...';
                     detectObjects();
@@ -186,7 +174,6 @@ button:disabled {
             }
         });
 
-        // Stop webcam
         stopBtn.addEventListener('click', () => {
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
@@ -202,7 +189,6 @@ button:disabled {
             stopBtn.disabled = true;
         });
 
-        // Initialize
         startBtn.disabled = true;
         stopBtn.disabled = true;
         loadModel();
