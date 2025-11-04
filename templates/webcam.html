@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Webcam with Object Detection</title>
+    <title>Webcam Access Demo</title>
     <style>
         body {
             font-family: sans-serif;
@@ -20,21 +19,7 @@
         h1 {
             margin-bottom: 20px;
         }
-        #container {
-            position: relative;
-            display: inline-block;
-        }
         video {
-            border: 2px solid #333;
-            border-radius: 8px;
-            width: 680px;
-            max-width: 100%;
-            display: block;
-        }
-        canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
             border: 2px solid #333;
             border-radius: 8px;
             width: 680px;
@@ -62,107 +47,66 @@
             font-size: 14px;
             color: #666;
         }
-        #detections {
-            margin-top: 15px;
-            padding: 10px;
-            background-color: #fff;
+        .info-box {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #fff3cd;
+            border: 1px solid #ffc107;
             border-radius: 6px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             max-width: 680px;
             width: 100%;
         }
-        .detection-item {
-            padding: 5px;
+        .info-box h3 {
+            margin-top: 0;
+            color: #856404;
+        }
+        .info-box p {
             margin: 5px 0;
-            background-color: #f0f9ff;
-            border-left: 3px solid #4f46e5;
-            border-radius: 3px;
+            color: #856404;
         }
     </style>
 </head>
 <body>
-    <h1>Webcam with Object Detection</h1>
-    <div id="container">
-        <video id="webcam" autoplay playsinline></video>
-        <canvas id="canvas"></canvas>
-    </div>
+    <h1>Webcam Access Demo</h1>
+    <video id="webcam" autoplay playsinline></video>
     <div>
         <button id="startBtn">Start Webcam</button>
         <button id="stopBtn" disabled>Stop Webcam</button>
-        <button id="detectBtn" disabled>Start Detection</button>
-        <button id="stopDetectBtn" disabled>Stop Detection</button>
     </div>
     <div id="status"></div>
-    <div id="detections"></div>
 
-    <!-- MediaPipe Object Detection -->
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/vision_bundle.js"></script>
+    <div class="info-box">
+        <h3>ℹ️ About Object Detection</h3>
+        <p><strong>Note:</strong> Object detection libraries (MediaPipe, TensorFlow.js, ml5.js) require WebGL, which is not available in Replit's workspace browser.</p>
+        <p><strong>Solution:</strong> For object detection to work, you would need to:</p>
+        <ul>
+            <li>Deploy your app and access it in a regular browser, OR</li>
+            <li>Use server-side detection (send frames to Python backend with OpenCV/YOLO)</li>
+        </ul>
+        <p>This webcam demo will work here in the workspace!</p>
+    </div>
 
-    <script type="module">
-        const { ObjectDetector, FilesetResolver } = window.MediaPipeTasksVision;
-        
+    <script>
         const videoElement = document.getElementById('webcam');
-        const canvasElement = document.getElementById('canvas');
-        const canvasCtx = canvasElement.getContext('2d');
         const startBtn = document.getElementById('startBtn');
         const stopBtn = document.getElementById('stopBtn');
-        const detectBtn = document.getElementById('detectBtn');
-        const stopDetectBtn = document.getElementById('stopDetectBtn');
         const statusDiv = document.getElementById('status');
-        const detectionsDiv = document.getElementById('detections');
-        
         let stream = null;
-        let objectDetector = null;
-        let isDetecting = false;
-        let animationId = null;
-
-        // Initialize MediaPipe Object Detector
-        async function initializeObjectDetector() {
-            try {
-                statusDiv.textContent = 'Loading object detection model...';
-                statusDiv.style.color = '#f59e0b';
-                
-                const vision = await FilesetResolver.forVisionTasks(
-                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm"
-                );
-                
-                objectDetector = await ObjectDetector.createFromOptions(vision, {
-                    baseOptions: {
-                        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite',
-                        delegate: "CPU"
-                    },
-                    scoreThreshold: 0.5,
-                    runningMode: "VIDEO"
-                });
-                
-                statusDiv.textContent = 'Object detection model loaded! Start webcam to begin.';
-                statusDiv.style.color = 'green';
-            } catch (error) {
-                console.error("Error loading object detector:", error);
-                statusDiv.textContent = `Error loading model: ${error.message}`;
-                statusDiv.style.color = 'red';
-            }
-        }
 
         // Start webcam
         startBtn.addEventListener('click', async () => {
             try {
                 statusDiv.textContent = 'Requesting camera access...';
+                statusDiv.style.color = '#f59e0b';
+
                 stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { width: 640, height: 480 }, 
                     audio: false 
                 });
                 videoElement.srcObject = stream;
-                
-                videoElement.addEventListener('loadeddata', () => {
-                    canvasElement.width = videoElement.videoWidth;
-                    canvasElement.height = videoElement.videoHeight;
-                });
-                
                 startBtn.disabled = true;
                 stopBtn.disabled = false;
-                detectBtn.disabled = false;
-                statusDiv.textContent = 'Camera active. Click "Start Detection" to detect objects.';
+                statusDiv.textContent = 'Camera active ✓';
                 statusDiv.style.color = 'green';
             } catch (error) {
                 console.error("Error accessing webcam:", error);
@@ -178,103 +122,10 @@
                 videoElement.srcObject = null;
                 startBtn.disabled = false;
                 stopBtn.disabled = true;
-                detectBtn.disabled = true;
-                
-                if (isDetecting) {
-                    stopDetection();
-                }
-                
                 statusDiv.textContent = 'Camera stopped';
                 statusDiv.style.color = '#666';
             }
         });
-
-        // Start detection
-        detectBtn.addEventListener('click', () => {
-            if (!objectDetector) {
-                statusDiv.textContent = 'Please wait for the model to load...';
-                return;
-            }
-            
-            isDetecting = true;
-            detectBtn.disabled = true;
-            stopDetectBtn.disabled = false;
-            statusDiv.textContent = 'Detecting objects...';
-            statusDiv.style.color = 'green';
-            
-            detectObjects();
-        });
-
-        // Stop detection
-        stopDetectBtn.addEventListener('click', () => {
-            stopDetection();
-        });
-
-        function stopDetection() {
-            isDetecting = false;
-            detectBtn.disabled = false;
-            stopDetectBtn.disabled = true;
-            if (animationId) {
-                cancelAnimationFrame(animationId);
-            }
-            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-            detectionsDiv.innerHTML = '';
-            statusDiv.textContent = 'Detection stopped';
-            statusDiv.style.color = '#666';
-        }
-
-        // Detect objects in video stream
-        let lastVideoTime = -1;
-        function detectObjects() {
-            if (!isDetecting) return;
-            
-            const currentVideoTime = videoElement.currentTime;
-            if (currentVideoTime !== lastVideoTime) {
-                lastVideoTime = currentVideoTime;
-                
-                const detections = objectDetector.detectForVideo(videoElement, performance.now());
-                
-                // Clear canvas
-                canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-                
-                // Draw detections
-                if (detections.detections.length > 0) {
-                    let detectionsHTML = '<strong>Detected Objects:</strong><br>';
-                    
-                    detections.detections.forEach((detection, index) => {
-                        const category = detection.categories[0];
-                        const bbox = detection.boundingBox;
-                        
-                        // Draw bounding box
-                        canvasCtx.strokeStyle = '#4f46e5';
-                        canvasCtx.lineWidth = 3;
-                        canvasCtx.strokeRect(bbox.originX, bbox.originY, bbox.width, bbox.height);
-                        
-                        // Draw label background
-                        const label = `${category.categoryName} (${Math.round(category.score * 100)}%)`;
-                        canvasCtx.fillStyle = '#4f46e5';
-                        canvasCtx.fillRect(bbox.originX, bbox.originY - 25, bbox.width, 25);
-                        
-                        // Draw label text
-                        canvasCtx.fillStyle = '#ffffff';
-                        canvasCtx.font = '16px sans-serif';
-                        canvasCtx.fillText(label, bbox.originX + 5, bbox.originY - 7);
-                        
-                        // Add to detections list
-                        detectionsHTML += `<div class="detection-item">${index + 1}. ${label}</div>`;
-                    });
-                    
-                    detectionsDiv.innerHTML = detectionsHTML;
-                } else {
-                    detectionsDiv.innerHTML = '<em>No objects detected</em>';
-                }
-            }
-            
-            animationId = requestAnimationFrame(detectObjects);
-        }
-
-        // Initialize on page load
-        initializeObjectDetector();
     </script>
 </body>
 </html>
