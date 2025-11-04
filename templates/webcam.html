@@ -1,68 +1,101 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Clicker Game</title>
-<style>
-body {
-font-family: sans-serif;
-background-color: #f1f59; /* A light slate color */
-display: flex;
-justify-content: center;
-align-items: center;
-min-height: 100vh;
-margin: 0;
-padding: 20px;
-}
-  video {
-              border: 2px solid #333;
-              border-radius: 8px;
-              width: 680px;
-              max-width: 100%;
-          }
-          button {
-              margin-top: 10px;
-              padding: 10px 20px;
-              font-size: 16px;
-          }
-      </style>
-  </head>
-  <body>
-      <h1>Webcam Access Demo</h1>
-      <video id="webcam" autoplay playsinline></video>
-      <br>
-      <button id="startBtn">Start Webcam</button>
-      <button id="stopBtn">Stop Webcam</button>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webcam Access Demo</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: #f1f1f9;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            margin-bottom: 20px;
+        }
+        video {
+            border: 2px solid #333;
+            border-radius: 8px;
+            width: 680px;
+            max-width: 100%;
+        }
+        button {
+            margin-top: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4f46e5;
+            color: white;
+            border: none;
+            border-radius: 6px;
+        }
+        button:hover {
+            background-color: #4338ca;
+        }
+        button:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+        #status {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <h1>Webcam Access Demo</h1>
+    <video id="webcam" autoplay playsinline></video>
+    <br>
+    <button id="startBtn">Start Webcam</button>
+    <button id="stopBtn" disabled>Stop Webcam</button>
+    <div id="status"></div>
 
-      <script>
-          const videoElement = document.getElementById('webcam');
-          const startBtn = document.getElementById('startBtn');
-          const stopBtn = document.getElementById('stopBtn');
-          let stream = null;
+    <script>
+        const videoElement = document.getElementById('webcam');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const statusDiv = document.getElementById('status');
+        let stream = null;
 
-          // Start webcam
-          startBtn.addEventListener('click', async () => {
-              try {
-                  stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-                  videoElement.srcObject = stream;
-              } catch (error) {
-                  console.error("Error accessing webcam:", error);
-                  alert("Could not access webcam. Please check permissions.");
-              }
-          });
+        // Start webcam
+        startBtn.addEventListener('click', async () => {
+            try {
+                statusDiv.textContent = 'Requesting camera access...';
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { width: 640, height: 480 }, 
+                    audio: false 
+                });
+                videoElement.srcObject = stream;
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                statusDiv.textContent = 'Camera active';
+                statusDiv.style.color = 'green';
+            } catch (error) {
+                console.error("Error accessing webcam:", error);
+                statusDiv.textContent = `Error: ${error.message}. Please check camera permissions.`;
+                statusDiv.style.color = 'red';
+            }
+        });
 
-          // Stop webcam
-          stopBtn.addEventListener('click', () => {
-              if (stream) {
-                  stream.getTracks().forEach(track => track.stop());
-                  videoElement.srcObject = null;
-              }
-          });
-        const permissions = new Permissions('camera');
-        permissions.request('getUserMedia', { webcam: true, audio: false });
-
-        
-      </script>
-  </body>
-  </html>
+        // Stop webcam
+        stopBtn.addEventListener('click', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                videoElement.srcObject = null;
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                statusDiv.textContent = 'Camera stopped';
+                statusDiv.style.color = '#666';
+            }
+        });
+    </script>
+</body>
+</html>
