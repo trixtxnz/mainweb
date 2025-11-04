@@ -1,68 +1,213 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Clicker Game</title>
+<title>Webcam Object Detection</title>
 <style>
 body {
-font-family: sans-serif;
-background-color: #f1f59; /* A light slate color */
-display: flex;
-justify-content: center;
-align-items: center;
-min-height: 100vh;
-margin: 0;
-padding: 20px;
+    font-family: sans-serif;
+    background-color: #f1f5f9;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 20px;
 }
-  video {
-              border: 2px solid #333;
-              border-radius: 8px;
-              width: 680px;
-              max-width: 100%;
-          }
-          button {
-              margin-top: 10px;
-              padding: 10px 20px;
-              font-size: 16px;
-          }
-      </style>
-  </head>
-  <body>
-      <h1>Webcam Access Demo</h1>
-      <video id="webcam" autoplay playsinline></video>
-      <br>
-      <button id="startBtn">Start Webcam</button>
-      <button id="stopBtn">Stop Webcam</button>
+h1 {
+    margin-bottom: 20px;
+}
+#container {
+    position: relative;
+    display: inline-block;
+}
+video {
+    border: 2px solid #333;
+    border-radius: 8px;
+    width: 680px;
+    max-width: 100%;
+    display: block;
+}
+#canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    border: 2px solid #333;
+    border-radius: 8px;
+    width: 680px;
+    max-width: 100%;
+}
+button {
+    margin-top: 10px;
+    padding: 10px 20px;
+    font-size: 16px;
+    background-color: #4f46e5;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+button:hover {
+    background-color: #4338ca;
+}
+button:disabled {
+    background-color: #9ca3af;
+    cursor: not-allowed;
+}
+#status {
+    margin-top: 15px;
+    padding: 10px;
+    background-color: #fff;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.controls {
+    margin-top: 15px;
+}
+</style>
+</head>
+<body>
+    <h1>Webcam Object Detection</h1>
+    <div id="status">Loading model...</div>
+    
+    <div id="container">
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="canvas"></canvas>
+    </div>
+    
+    <div class="controls">
+        <button id="startBtn">Start Webcam & Detection</button>
+        <button id="stopBtn">Stop Webcam</button>
+    </div>
 
-      <script>
-          const videoElement = document.getElementById('webcam');
-          const startBtn = document.getElementById('startBtn');
-          const stopBtn = document.getElementById('stopBtn');
-          let stream = null;
+    <!-- Load TensorFlow.js and COCO-SSD model -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.11.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3"></script>
 
-          // Start webcam
-          startBtn.addEventListener('click', async () => {
-              try {
-                  stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-                  videoElement.srcObject = stream;
-              } catch (error) {
-                  console.error("Error accessing webcam:", error);
-                  alert("Could not access webcam. Please check permissions.");
-              }
-          });
-
-          // Stop webcam
-          stopBtn.addEventListener('click', () => {
-              if (stream) {
-                  stream.getTracks().forEach(track => track.stop());
-                  videoElement.srcObject = null;
-              }
-          });
-        const permissions = new Permissions('camera');
-        permissions.request('getUserMedia', { webcam: true, audio: false });
-
+    <script>
+        const videoElement = document.getElementById('webcam');
+        const canvasElement = document.getElementById('canvas');
+        const ctx = canvasElement.getContext('2d');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const statusDiv = document.getElementById('status');
         
-      </script>
-  </body>
-  </html>
+        let stream = null;
+        let model = null;
+        let animationId = null;
+
+        // Load the COCO-SSD model
+        async function loadModel() {
+            try {
+                statusDiv.textContent = 'Loading object detection model...';
+                model = await cocoSsd.load();
+                statusDiv.textContent = 'Model loaded! Click "Start Webcam & Detection" to begin.';
+                startBtn.disabled = false;
+            } catch (error) {
+                console.error("Error loading model:", error);
+                statusDiv.textContent = 'Error loading model. Please refresh the page.';
+            }
+        }
+
+        // Detect objects in the video feed
+        async function detectObjects() {
+            if (!model || !stream) return;
+
+            // Make sure canvas matches video dimensions
+            canvasElement.width = videoElement.videoWidth;
+            canvasElement.height = videoElement.videoHeight;
+
+            // Run detection
+            const predictions = await model.detect(videoElement);
+
+            // Clear previous drawings
+            ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+            // Draw bounding boxes and labels
+            predictions.forEach(prediction => {
+                const [x, y, width, height] = prediction.bbox;
+                
+                // Draw bounding box
+                ctx.strokeStyle = '#00ff00';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(x, y, width, height);
+
+                // Draw label background
+                ctx.fillStyle = '#00ff00';
+                const textWidth = ctx.measureText(prediction.class).width;
+                ctx.fillRect(x, y - 25, textWidth + 10, 25);
+
+                // Draw label text
+                ctx.fillStyle = '#000000';
+                ctx.font = '18px Arial';
+                ctx.fillText(
+                    `${prediction.class} ${Math.round(prediction.score * 100)}%`,
+                    x + 5,
+                    y - 7
+                );
+            });
+
+            // Update status
+            if (predictions.length > 0) {
+                const objects = predictions.map(p => p.class).join(', ');
+                statusDiv.textContent = `Detected: ${objects}`;
+            } else {
+                statusDiv.textContent = 'No objects detected';
+            }
+
+            // Continue detection loop
+            animationId = requestAnimationFrame(detectObjects);
+        }
+
+        // Start webcam
+        startBtn.addEventListener('click', async () => {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }, 
+                    audio: false 
+                });
+                videoElement.srcObject = stream;
+                
+                // Wait for video to be ready
+                videoElement.onloadedmetadata = () => {
+                    statusDiv.textContent = 'Webcam started. Detecting objects...';
+                    detectObjects();
+                };
+                
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+            } catch (error) {
+                console.error("Error accessing webcam:", error);
+                statusDiv.textContent = "Could not access webcam. Please check permissions.";
+            }
+        });
+
+        // Stop webcam
+        stopBtn.addEventListener('click', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                videoElement.srcObject = null;
+            }
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+            ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            statusDiv.textContent = 'Webcam stopped.';
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+        });
+
+        // Initialize
+        startBtn.disabled = true;
+        stopBtn.disabled = true;
+        loadModel();
+    </script>
+</body>
+</html>
