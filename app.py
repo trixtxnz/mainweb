@@ -155,15 +155,34 @@ def detect_objects():
         if frame is None:
             return jsonify({'error': 'Failed to decode image'}), 400
         
-        # Load pre-trained face detector (Haar Cascade)
-        # This is a simple detector that comes with OpenCV
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        # Load improved face detector (Haar Cascade)
+        # Using alt2 version which is more accurate than default
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_alt2.xml')
         
-        # Convert to grayscale for face detection
+        # Fallback to default if alt2 not available
+        if face_cascade.empty():
+            face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        
+        # Convert to grayscale and enhance image quality
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         
-        # Detect faces
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        # Apply histogram equalization to improve contrast
+        gray = cv2.equalizeHist(gray)
+        
+        # Optional: Reduce noise with Gaussian blur
+        gray = cv2.GaussianBlur(gray, (3, 3), 0)
+        
+        # Detect faces with improved parameters
+        # scaleFactor: smaller = more accurate but slower (1.05-1.1 recommended)
+        # minNeighbors: higher = fewer false positives (5-8 recommended)
+        # minSize: larger = ignore small/distant faces
+        faces = face_cascade.detectMultiScale(
+            gray, 
+            scaleFactor=1.05,      # More thorough scanning
+            minNeighbors=6,        # Require more overlapping detections
+            minSize=(50, 50),      # Ignore very small faces
+            flags=cv2.CASCADE_SCALE_IMAGE
+        )
         
         # Prepare detection results
         detections = []
