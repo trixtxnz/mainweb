@@ -1,145 +1,68 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Webcam Access Demo</title>
-    <style>
-        body {
-            font-family: sans-serif;
-            background-color: #f1f1f9; /* A light slate color */
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 20px;
-            flex-direction: column;
-        }
-        h1 {
-            margin-bottom: 20px;
-        }
-        #container {
-            position: relative;
-            display: inline-block;
-        }
-        video {
-            border: 2px solid #333;
-            border-radius: 8px;
-            width: 680px;
-            max-width: 100%;
-            display: block;
-        }
-        #canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            border: 2px solid #333;
-            border-radius: 8px;
-            width: 680px;
-            max-width: 100%;
-        }
-        button {
-            margin-top: 10px;
-            padding: 10px 20px;
-            font-size: 16px;
-            background-color: #4f46e5;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #4338ca;
-        }
-        button:disabled {
-            background-color: #9ca3af;
-            cursor: not-allowed;
-        }
-        #status {
-            margin-top: 15px;
-            padding: 10px;
-            background-color: #fff;
-            border-radius: 6px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .controls {
-            margin-top: 15px;
-        }
-    </style>
-</head>
-<body>
-    <h1>Webcam Access Demo</h1>
-    <div id="status">Loading model...</div>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clicker Game</title>
+<style>
+body {
+font-family: sans-serif;
+background-color: #f1f59; /* A light slate color */
+display: flex;
+justify-content: center;
+align-items: center;
+min-height: 100vh;
+margin: 0;
+padding: 20px;
+}
+  video {
+              border: 2px solid #333;
+              border-radius: 8px;
+              width: 680px;
+              max-width: 100%;
+          }
+          button {
+              margin-top: 10px;
+              padding: 10px 20px;
+              font-size: 16px;
+          }
+      </style>
+  </head>
+  <body>
+      <h1>Webcam Access Demo</h1>
+      <video id="webcam" autoplay playsinline></video>
+      <br>
+      <button id="startBtn">Start Webcam</button>
+      <button id="stopBtn">Stop Webcam</button>
 
-    <div id="container">
-        <video id="webcam" autoplay playsinline></video>
-        <canvas id="canvas"></canvas>
-    </div>
+      <script>
+          const videoElement = document.getElementById('webcam');
+          const startBtn = document.getElementById('startBtn');
+          const stopBtn = document.getElementById('stopBtn');
+          let stream = null;
 
-    <div class="controls">
-        <button id="startBtn">Start Webcam</button>
-        <button id="stopBtn">Stop Webcam</button>
-    </div>
+          // Start webcam
+          startBtn.addEventListener('click', async () => {
+              try {
+                  stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                  videoElement.srcObject = stream;
+              } catch (error) {
+                  console.error("Error accessing webcam:", error);
+                  alert("Could not access webcam. Please check permissions.");
+              }
+          });
 
-    <script>
-        const videoElement = document.getElementById('webcam');
-        const canvasElement = document.getElementById('canvas');
-        const ctx = canvasElement.getContext('2d');
-        const startBtn = document.getElementById('startBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const statusDiv = document.getElementById('status');
+          // Stop webcam
+          stopBtn.addEventListener('click', () => {
+              if (stream) {
+                  stream.getTracks().forEach(track => track.stop());
+                  videoElement.srcObject = null;
+              }
+          });
+        const permissions = new Permissions('camera');
+        permissions.request('getUserMedia', { webcam: true, audio: false });
 
-        let stream = null;
-        let model = null; // This is kept from original but will not be used with the simplified JS
-        let animationId = null; // This is kept from original but will not be used with the simplified JS
-
-        // Removed loadModel function as it's not used in the simplified version
-
-        // Removed detectObjects function as it's not used in the simplified version
-
-        startBtn.addEventListener('click', async () => {
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-                videoElement.srcObject = stream;
-
-                videoElement.onloadedmetadata = () => {
-                    statusDiv.textContent = 'Webcam started.';
-                    // Removed the call to detectObjects()
-                };
-
-                startBtn.disabled = true;
-                stopBtn.disabled = false;
-            } catch (error) {
-                console.error("Error accessing webcam:", error);
-                statusDiv.textContent = "Could not access webcam. Please check permissions.";
-                alert("Could not access webcam. Please check permissions.");
-            }
-        });
-
-        stopBtn.addEventListener('click', () => {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-                videoElement.srcObject = null;
-            }
-            // Removed cancelAnimationFrame as it's not used
-            ctx.clearRect(0, 0, canvasElement.width, canvasElement.height); // Kept this for canvas clearing
-            statusDiv.textContent = 'Webcam stopped.';
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
-        });
-
-        // NOTE: The following lines from the original code are INVALID and cause errors
-        // They use a Permissions API that doesn't exist in browsers this way
-        // I'm commenting them out so the page works:
-
-        // const permissions = new Permissions('camera');
-        // permissions.request('getUserMedia', { webcam: true, audio: false });
-
-        startBtn.disabled = true;
-        stopBtn.disabled = true;
-        statusDiv.textContent = 'Ready to start webcam.'; // Changed status message
-        // Removed loadModel() call
-    </script>
-</body>
-</html>
+        
+      </script>
+  </body>
+  </html>
