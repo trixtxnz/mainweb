@@ -127,6 +127,10 @@ def index():
 def welcome():
     return render_template('welcome.html')
 
+@app.route('/webcam')
+def webcam():
+    return render_template('webcam.html')
+
 @app.route('/website')
 def website():
     if 'username' not in session:

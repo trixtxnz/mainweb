@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clicker Game</title>
+<style>
+body {
+font-family: sans-serif;
+background-color: #f1f59; /* A light slate color */
+display: flex;
+justify-content: center;
+align-items: center;
+min-height: 100vh;
+margin: 0;
+padding: 20px;
+}
+  video {
+              border: 2px solid #333;
+              border-radius: 8px;
+              width: 680px;
+              max-width: 100%;
+          }
+          button {
+              margin-top: 10px;
+              padding: 10px 20px;
+              font-size: 16px;
+          }
+      </style>
+  </head>
+  <body>
+      <h1>Webcam Access Demo</h1>
+      <video id="webcam" autoplay playsinline></video>
+      <br>
+      <button id="startBtn">Start Webcam</button>
+      <button id="stopBtn">Stop Webcam</button>
+
+      <script>
+          const videoElement = document.getElementById('webcam');
+          const startBtn = document.getElementById('startBtn');
+          const stopBtn = document.getElementById('stopBtn');
+          let stream = null;
+
+          // Start webcam
+          startBtn.addEventListener('click', async () => {
+              try {
+                  stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                  videoElement.srcObject = stream;
+              } catch (error) {
+                  console.error("Error accessing webcam:", error);
+                  alert("Could not access webcam. Please check permissions.");
+              }
+          });
+
+          // Stop webcam
+          stopBtn.addEventListener('click', () => {
+              if (stream) {
+                  stream.getTracks().forEach(track => track.stop());
+                  videoElement.srcObject = null;
+              }
+          });
+        const permissions = new Permissions('camera');
+        permissions.request('getUserMedia', { webcam: true, audio: false });
+
+        
+      </script>
+  </body>
+  </html>
