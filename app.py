@@ -57,11 +57,11 @@ def get_user_prefs(username):
     users = load_users()
     if username not in users:
         return get_default_prefs()
-    
+
     user_data = users[username]
     if 'prefs' not in user_data:
         return get_default_prefs()
-    
+
     # Ensure all required keys exist with defaults
     prefs = get_default_prefs()
     prefs.update(user_data['prefs'])
@@ -70,10 +70,10 @@ def get_user_prefs(username):
 def validate_prefs(form):
     """Validate and normalize user preferences"""
     import re
-    
+
     errors = []
     prefs = {}
-    
+
     # Validate welcome text
     welcome_text = form.get('welcome_text', '').strip()
     if not welcome_text:
@@ -84,7 +84,7 @@ def validate_prefs(form):
         errors.append('Welcome text cannot contain HTML tags')
     else:
         prefs['welcome_text'] = welcome_text
-    
+
     # Validate background color
     bg_color = form.get('bg_color', '').strip().lower()
     if not bg_color:
@@ -93,7 +93,7 @@ def validate_prefs(form):
         errors.append('Background color must be a valid hex color (e.g., #ff0000)')
     else:
         prefs['bg_color'] = bg_color
-    
+
     # Validate text color
     text_color = form.get('text_color', '').strip().lower()
     if not text_color:
@@ -102,7 +102,7 @@ def validate_prefs(form):
         errors.append('Text color must be a valid hex color (e.g., #000000)')
     else:
         prefs['text_color'] = text_color
-    
+
     # Validate font size
     font_size = form.get('font_size', '').strip()
     if not font_size:
@@ -116,7 +116,7 @@ def validate_prefs(form):
                 prefs['font_size'] = str(size)
         except ValueError:
             errors.append('Font size must be a valid number')
-    
+
     return prefs, errors
 
 @app.route('/')
@@ -138,40 +138,40 @@ def detect_objects():
         import cv2
         import numpy as np
         import base64
-        
+
         # Get the image data from request
         data = request.json
         image_data = data.get('image', '')
-        
+
         # Remove the data URL prefix
         if ',' in image_data:
             image_data = image_data.split(',')[1]
-        
+
         # Decode base64 image
         image_bytes = base64.b64decode(image_data)
         nparr = np.frombuffer(image_bytes, np.uint8)
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        
+
         if frame is None:
             return jsonify({'error': 'Failed to decode image'}), 400
-        
+
         # Load improved face detector (Haar Cascade)
         # Using alt2 version which is more accurate than default
         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_alt2.xml')
-        
+
         # Fallback to default if alt2 not available
         if face_cascade.empty():
             face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        
+
         # Convert to grayscale and enhance image quality
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        
+
         # Apply histogram equalization to improve contrast
         gray = cv2.equalizeHist(gray)
-        
+
         # Optional: Reduce noise with Gaussian blur
         gray = cv2.GaussianBlur(gray, (3, 3), 0)
-        
+
         # Detect faces with improved parameters
         # scaleFactor: smaller = more accurate but slower (1.05-1.1 recommended)
         # minNeighbors: higher = fewer false positives (5-8 recommended)
@@ -183,7 +183,7 @@ def detect_objects():
             minSize=(50, 50),      # Ignore very small faces
             flags=cv2.CASCADE_SCALE_IMAGE
         )
-        
+
         # Prepare detection results
         detections = []
         for (x, y, w, h) in faces:
@@ -197,12 +197,12 @@ def detect_objects():
                     'height': int(h)
                 }
             })
-        
+
         return jsonify({
             'detections': detections,
             'count': len(detections)
         })
-        
+
     except Exception as e:
         print(f"Detection error: {e}")
         return jsonify({'error': str(e)}), 500
@@ -212,7 +212,7 @@ def website():
     if 'username' not in session:
         flash('Please sign in to access the website', 'error')
         return redirect(url_for('welcome'))
-    
+
     username = session['username']
     prefs = get_user_prefs(username)
     return render_template('website.html', username=username, prefs=prefs)
@@ -222,7 +222,7 @@ def settings():
     if 'username' not in session:
         flash('Please sign in to access settings', 'error')
         return redirect(url_for('welcome'))
-    
+
     username = session['username']
     prefs = get_user_prefs(username)
     return render_template('settings.html', prefs=prefs)
@@ -232,25 +232,25 @@ def save_settings():
     if 'username' not in session:
         flash('Please sign in to access settings', 'error')
         return redirect(url_for('welcome'))
-    
+
     username = session['username']
     prefs, errors = validate_prefs(request.form)
-    
+
     if errors:
         for error in errors:
             flash(error, 'error')
         current_prefs = get_user_prefs(username)
         return render_template('settings.html', prefs=current_prefs)
-    
+
     # Sanitize username for file operations (defense in depth)
     safe_username = secure_filename(username)
-    
+
     # Get current background image before making changes
     users = load_users()
     current_bg_image = None
     if username in users and 'prefs' in users[username]:
         current_bg_image = users[username]['prefs'].get('bg_image')
-    
+
     # Process removal BEFORE upload (takes precedence)
     if request.form.get('remove_bg_image') == 'true':
         # Delete the file from disk if it exists
@@ -266,7 +266,7 @@ def save_settings():
     # Handle background image upload
     elif 'bg_image' in request.files:
         file = request.files['bg_image']
-        
+
         # Check if a file was actually selected
         if file and file.filename and file.filename != '':
             if allowed_file(file.filename):
@@ -279,28 +279,28 @@ def save_settings():
                             os.remove(old_file_path)
                         except OSError:
                             pass  # Continue even if deletion fails
-                
+
                 # Create a unique filename with sanitized username prefix
                 original_filename = secure_filename(file.filename)
                 file_extension = original_filename.rsplit('.', 1)[1].lower()
                 unique_filename = f"{safe_username}_bg.{file_extension}"
-                
+
                 # Save the file
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
                 file.save(file_path)
-                
+
                 # Store the filename in preferences
                 prefs['bg_image'] = unique_filename
                 flash('Background image uploaded successfully!', 'success')
             else:
                 flash('Invalid file type. Please upload PNG, JPG, JPEG, GIF, or WebP files.', 'error')
-    
+
     # Save preferences
     if 'prefs' not in users[username]:
         users[username]['prefs'] = {}
     users[username]['prefs'].update(prefs)
     save_users(users)
-    
+
     flash('Settings saved successfully!', 'success')
     return redirect(url_for('website'))
 
@@ -327,7 +327,7 @@ def clicker():
     if 'has_auto_clicker' not in users[username]:
         users[username]['has_auto_clicker'] = False
     save_users(users)
-    
+
     current_clicks = users[username]['clicks']
     current_bonus = users[username]['click_bonus']
     has_unlocked_100 = users[username]['has_unlocked_100']
@@ -464,10 +464,10 @@ def spend_clicks():
 
     # Decrement click count
     users[username]['clicks'] -= SPEND_AMOUNT
-    
+
     # Increase the click bonus (stacking effect)
     users[username]['click_bonus'] += 1
-    
+
     # Unlock the 100 clicks upgrade
     users[username]['has_unlocked_100'] = True
 
@@ -501,7 +501,7 @@ def spend_clicks_100():
         users[username]['has_unlocked_100'] = False
 
     current_clicks = users[username]['clicks']
-    
+
     # 3. Validation Check: Must have unlocked this upgrade first
     if not users[username]['has_unlocked_100']:
         return jsonify({
@@ -511,14 +511,6 @@ def spend_clicks_100():
             'has_unlocked_100': users[username]['has_unlocked_100']
         }), 403
 
-   
-    
-    
-    
-    
-    
-    
-    
     # 4. Validation Check (CRITICAL: Server is the authority)
     if current_clicks < SPEND_AMOUNT:
         return jsonify({
@@ -532,10 +524,10 @@ def spend_clicks_100():
 
     # Decrement click count
     users[username]['clicks'] -= SPEND_AMOUNT
-    
+
     # Increase the click bonus by 5 (bigger upgrade)
     users[username]['click_bonus'] += 10
-    
+
     # Unlock the 1000 clicks upgrade
     users[username]['has_unlocked_1000'] = True
 
@@ -567,70 +559,11 @@ def spend_clicks_1000():
     if 'click_bonus' not in users[username]:
         users[username]['click_bonus'] = 1
 
-@app.route('/unlock_auto_clicker', methods=['POST'])
-def unlock_auto_clicker():
-    # 1. Authentication Check
-    if 'username' not in session:
-        return jsonify({'error': 'Not logged in'}), 401
-
-    # 2. Load User Data
-    users = load_users()
-    username = session['username']
-    SPEND_AMOUNT = 15000  # Cost to unlock auto-clicker
-
-    # Initialize if not present
-    if 'clicks' not in users[username]:
-        users[username]['clicks'] = 0
-    if 'has_unlocked_10000' not in users[username]:
-        users[username]['has_unlocked_10000'] = False
-    if 'has_auto_clicker' not in users[username]:
-        users[username]['has_auto_clicker'] = False
-
-    current_clicks = users[username]['clicks']
-
-    # 3. Validation Check: Must have unlocked the 10000 upgrade first
-    if not users[username]['has_unlocked_10000']:
-        return jsonify({
-            'error': 'You must unlock the 10000 upgrade first.',
-            'clicks': current_clicks,
-            'has_auto_clicker': users[username]['has_auto_clicker']
-        }), 403
-
-    # 4. Check if already unlocked
-    if users[username]['has_auto_clicker']:
-        return jsonify({
-            'error': 'Auto-clicker already unlocked.',
-            'clicks': current_clicks,
-            'has_auto_clicker': True
-        }), 400
-
-    # 5. Validation Check: Must have enough clicks
-    if current_clicks < SPEND_AMOUNT:
-        return jsonify({
-            'error': f'Insufficient clicks. Need {SPEND_AMOUNT}, have {current_clicks}.',
-            'clicks': current_clicks,
-            'has_auto_clicker': users[username]['has_auto_clicker']
-        }), 400
-
-    # 6. Deduct clicks and unlock the auto-clicker
-    users[username]['clicks'] -= SPEND_AMOUNT
-    users[username]['has_auto_clicker'] = True
-
-    # Save the updated data
-    save_users(users)
-
-    # 7. Success Response
-    return jsonify({
-        'clicks': users[username]['clicks'],
-        'has_auto_clicker': users[username]['has_auto_clicker']
-    })
-
-
     if 'has_unlocked_1000' not in users[username]:
         users[username]['has_unlocked_1000'] = False
 
     current_clicks = users[username]['clicks']
-    
+
     # 3. Validation Check: Must have unlocked this upgrade first
     if not users[username]['has_unlocked_1000']:
         return jsonify({
@@ -655,10 +588,10 @@ def unlock_auto_clicker():
 
     # Decrement click count
     users[username]['clicks'] -= SPEND_AMOUNT
-    
+
     # Increase the click bonus by 100 (even bigger upgrade)
     users[username]['click_bonus'] += 100
-    
+
     # Unlock the 10000 clicks upgrade
     users[username]['has_unlocked_10000'] = True
 
@@ -736,7 +669,64 @@ def spend_clicks_10000():
             'has_unlocked_10000': users[username]['has_unlocked_10000']
         })
 
+@app.route('/unlock_auto_clicker', methods=['POST'])
+def unlock_auto_clicker():
+    # 1. Authentication Check
+    if 'username' not in session:
+        return jsonify({'error': 'Not logged in'}), 401
+
+    # 2. Load User Data
+    users = load_users()
+    username = session['username']
+    SPEND_AMOUNT = 15000  # Cost to unlock auto-clicker
+
+    # Initialize if not present
+    if 'clicks' not in users[username]:
+        users[username]['clicks'] = 0
+    if 'has_unlocked_10000' not in users[username]:
+        users[username]['has_unlocked_10000'] = False
+    if 'has_auto_clicker' not in users[username]:
+        users[username]['has_auto_clicker'] = False
+
+    current_clicks = users[username]['clicks']
+
+    # 3. Validation Check: Must have unlocked the 10000 upgrade first
+    if not users[username]['has_unlocked_10000']:
+        return jsonify({
+            'error': 'You must unlock the 10000 upgrade first.',
+            'clicks': current_clicks,
+            'has_auto_clicker': users[username]['has_auto_clicker']
+        }), 403
+
+    # 4. Check if already unlocked
+    if users[username]['has_auto_clicker']:
+        return jsonify({
+            'error': 'Auto-clicker already unlocked.',
+            'clicks': current_clicks,
+            'has_auto_clicker': True
+        }), 400
+
+    # 5. Validation Check: Must have enough clicks
+    if current_clicks < SPEND_AMOUNT:
+        return jsonify({
+            'error': f'Insufficient clicks. Need {SPEND_AMOUNT}, have {current_clicks}.',
+            'clicks': current_clicks,
+            'has_auto_clicker': users[username]['has_auto_clicker']
+        }), 400
+
+    # 6. Deduct clicks and unlock the auto-clicker
+    users[username]['clicks'] -= SPEND_AMOUNT
+    users[username]['has_auto_clicker'] = True
+
+    # Save the updated data
+    save_users(users)
+
+    # 7. Success Response
+    return jsonify({
+        'clicks': users[username]['clicks'],
+        'has_auto_clicker': users[username]['has_auto_clicker']
+    })
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
-
-
