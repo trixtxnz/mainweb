@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Webcam Access Demo</title>
+    <title>Webcam Object Detection</title>
     <style>
         body {
             font-family: sans-serif;
@@ -19,11 +20,25 @@
         h1 {
             margin-bottom: 20px;
         }
+        .video-container {
+            position: relative;
+            width: 680px;
+            max-width: 100%;
+        }
         video {
             border: 2px solid #333;
             border-radius: 8px;
-            width: 680px;
-            max-width: 100%;
+            width: 100%;
+            display: block;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            border: 2px solid #333;
+            border-radius: 8px;
+            width: 100%;
+            pointer-events: none;
         }
         button {
             margin: 10px 5px;
@@ -47,51 +62,67 @@
             font-size: 14px;
             color: #666;
         }
+        #detectionInfo {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #e0f2fe;
+            border: 1px solid #0ea5e9;
+            border-radius: 6px;
+            min-height: 30px;
+        }
         .info-box {
             margin-top: 20px;
             padding: 15px;
-            background-color: #fff3cd;
-            border: 1px solid #ffc107;
+            background-color: #d1fae5;
+            border: 1px solid #10b981;
             border-radius: 6px;
             max-width: 680px;
             width: 100%;
         }
         .info-box h3 {
             margin-top: 0;
-            color: #856404;
+            color: #065f46;
         }
         .info-box p {
             margin: 5px 0;
-            color: #856404;
+            color: #065f46;
         }
     </style>
 </head>
 <body>
-    <h1>Webcam Access Demo</h1>
-    <video id="webcam" autoplay playsinline></video>
+    <h1>Webcam Object Detection (Server-Side)</h1>
+    <div class="video-container">
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="canvas"></canvas>
+    </div>
     <div>
         <button id="startBtn">Start Webcam</button>
         <button id="stopBtn" disabled>Stop Webcam</button>
+        <button id="detectBtn" disabled>Toggle Detection</button>
     </div>
     <div id="status"></div>
+    <div id="detectionInfo"></div>
 
     <div class="info-box">
-        <h3>ℹ️ About Object Detection</h3>
-        <p><strong>Note:</strong> Object detection libraries (MediaPipe, TensorFlow.js, ml5.js) require WebGL, which is not available in Replit's workspace browser.</p>
-        <p><strong>Solution:</strong> For object detection to work, you would need to:</p>
-        <ul>
-            <li>Deploy your app and access it in a regular browser, OR</li>
-            <li>Use server-side detection (send frames to Python backend with OpenCV/YOLO)</li>
-        </ul>
-        <p>This webcam demo will work here in the workspace!</p>
+        <h3>✅ Server-Side Detection</h3>
+        <p><strong>This works in Replit workspace!</strong> Frames are sent to the Python backend for processing using OpenCV.</p>
+        <p>Currently detecting: <strong>Faces</strong> (using Haar Cascade classifier)</p>
+        <p>Click "Toggle Detection" to start/stop object detection.</p>
     </div>
 
     <script>
         const videoElement = document.getElementById('webcam');
+        const canvasElement = document.getElementById('canvas');
+        const ctx = canvasElement.getContext('2d');
         const startBtn = document.getElementById('startBtn');
         const stopBtn = document.getElementById('stopBtn');
+        const detectBtn = document.getElementById('detectBtn');
         const statusDiv = document.getElementById('status');
+        const detectionInfo = document.getElementById('detectionInfo');
+        
         let stream = null;
+        let detectionActive = false;
+        let detectionInterval = null;
 
         // Start webcam
         startBtn.addEventListener('click', async () => {
@@ -104,8 +135,16 @@
                     audio: false 
                 });
                 videoElement.srcObject = stream;
+                
+                // Set canvas size to match video
+                videoElement.onloadedmetadata = () => {
+                    canvasElement.width = videoElement.videoWidth;
+                    canvasElement.height = videoElement.videoHeight;
+                };
+                
                 startBtn.disabled = true;
                 stopBtn.disabled = false;
+                detectBtn.disabled = false;
                 statusDiv.textContent = 'Camera active ✓';
                 statusDiv.style.color = 'green';
             } catch (error) {
@@ -122,10 +161,116 @@
                 videoElement.srcObject = null;
                 startBtn.disabled = false;
                 stopBtn.disabled = true;
+                detectBtn.disabled = true;
+                
+                if (detectionActive) {
+                    stopDetection();
+                }
+                
+                ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
                 statusDiv.textContent = 'Camera stopped';
                 statusDiv.style.color = '#666';
+                detectionInfo.textContent = '';
             }
         });
+
+        // Toggle detection
+        detectBtn.addEventListener('click', () => {
+            if (detectionActive) {
+                stopDetection();
+            } else {
+                startDetection();
+            }
+        });
+
+        function startDetection() {
+            detectionActive = true;
+            detectBtn.textContent = 'Stop Detection';
+            detectBtn.style.backgroundColor = '#dc2626';
+            statusDiv.textContent = 'Detection active 🔍';
+            statusDiv.style.color = '#10b981';
+            
+            // Run detection every 500ms
+            detectionInterval = setInterval(detectObjects, 500);
+        }
+
+        function stopDetection() {
+            detectionActive = false;
+            detectBtn.textContent = 'Start Detection';
+            detectBtn.style.backgroundColor = '#4f46e5';
+            
+            if (detectionInterval) {
+                clearInterval(detectionInterval);
+                detectionInterval = null;
+            }
+            
+            ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            detectionInfo.textContent = 'Detection stopped';
+            statusDiv.textContent = 'Camera active ✓';
+            statusDiv.style.color = 'green';
+        }
+
+        async function detectObjects() {
+            if (!videoElement.videoWidth || !videoElement.videoHeight) return;
+
+            // Create a temporary canvas to capture the frame
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = videoElement.videoWidth;
+            tempCanvas.height = videoElement.videoHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(videoElement, 0, 0);
+
+            // Convert to base64
+            const imageData = tempCanvas.toDataURL('image/jpeg', 0.8);
+
+            try {
+                const response = await fetch('/detect_objects', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ image: imageData })
+                });
+
+                const result = await response.json();
+
+                if (result.error) {
+                    console.error('Detection error:', result.error);
+                    detectionInfo.textContent = `Error: ${result.error}`;
+                    return;
+                }
+
+                // Clear previous drawings
+                ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+                // Draw detection boxes
+                if (result.detections && result.detections.length > 0) {
+                    ctx.strokeStyle = '#10b981';
+                    ctx.lineWidth = 3;
+                    ctx.font = '16px sans-serif';
+                    ctx.fillStyle = '#10b981';
+
+                    result.detections.forEach(detection => {
+                        const { x, y, width, height } = detection.box;
+                        
+                        // Draw rectangle
+                        ctx.strokeRect(x, y, width, height);
+                        
+                        // Draw label
+                        const label = `${detection.label} ${Math.round(detection.confidence * 100)}%`;
+                        ctx.fillText(label, x, y - 5);
+                    });
+
+                    detectionInfo.textContent = `Detected ${result.count} face(s)`;
+                } else {
+                    detectionInfo.textContent = 'No faces detected';
+                }
+
+            } catch (error) {
+                console.error('Fetch error:', error);
+                detectionInfo.textContent = `Network error: ${error.message}`;
+            }
+        }
     </script>
 </body>
 </html>

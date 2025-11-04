@@ -131,6 +131,63 @@ def welcome():
 def webcam():
     return render_template('webcam.html')
 
+@app.route('/detect_objects', methods=['POST'])
+def detect_objects():
+    """Process webcam frame and detect objects using OpenCV"""
+    try:
+        import cv2
+        import numpy as np
+        import base64
+        
+        # Get the image data from request
+        data = request.json
+        image_data = data.get('image', '')
+        
+        # Remove the data URL prefix
+        if ',' in image_data:
+            image_data = image_data.split(',')[1]
+        
+        # Decode base64 image
+        image_bytes = base64.b64decode(image_data)
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if frame is None:
+            return jsonify({'error': 'Failed to decode image'}), 400
+        
+        # Load pre-trained face detector (Haar Cascade)
+        # This is a simple detector that comes with OpenCV
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        
+        # Convert to grayscale for face detection
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        
+        # Detect faces
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        
+        # Prepare detection results
+        detections = []
+        for (x, y, w, h) in faces:
+            detections.append({
+                'label': 'Face',
+                'confidence': 0.95,  # Haar cascades don't provide confidence scores
+                'box': {
+                    'x': int(x),
+                    'y': int(y),
+                    'width': int(w),
+                    'height': int(h)
+                }
+            })
+        
+        return jsonify({
+            'detections': detections,
+            'count': len(detections)
+        })
+        
+    except Exception as e:
+        print(f"Detection error: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/website')
 def website():
     if 'username' not in session:
