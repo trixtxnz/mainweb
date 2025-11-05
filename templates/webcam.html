@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -105,7 +106,7 @@
     <div class="info-box">
         <h3>✅ Server-Side Detection</h3>
         <p><strong>This works in Replit workspace!</strong> Frames are sent to the Python backend for processing using OpenCV.</p>
-        <p>Currently detecting: <strong>Faces, Hands, Palms</strong> (using Haar Cascade classifiers)</p>
+        <p>Currently detecting: <strong>Faces, Smiles, Hands, Palms, Fists</strong> (using Haar Cascade classifiers)</p>
         <p>Click "Toggle Detection" to start/stop object detection.</p>
         <p><em>Note: Extract custom cascade XML files to a 'cascades/' folder for enhanced detection.</em></p>
     </div>
@@ -119,7 +120,7 @@
         const detectBtn = document.getElementById('detectBtn');
         const statusDiv = document.getElementById('status');
         const detectionInfo = document.getElementById('detectionInfo');
-
+        
         let stream = null;
         let detectionActive = false;
         let detectionInterval = null;
@@ -135,13 +136,13 @@
                     audio: false 
                 });
                 videoElement.srcObject = stream;
-
+                
                 // Set canvas size to match video
                 videoElement.onloadedmetadata = () => {
                     canvasElement.width = videoElement.videoWidth;
                     canvasElement.height = videoElement.videoHeight;
                 };
-
+                
                 startBtn.disabled = true;
                 stopBtn.disabled = false;
                 detectBtn.disabled = false;
@@ -162,11 +163,11 @@
                 startBtn.disabled = false;
                 stopBtn.disabled = true;
                 detectBtn.disabled = true;
-
+                
                 if (detectionActive) {
                     stopDetection();
                 }
-
+                
                 ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
                 statusDiv.textContent = 'Camera stopped';
                 statusDiv.style.color = '#666';
@@ -189,7 +190,7 @@
             detectBtn.style.backgroundColor = '#dc2626';
             statusDiv.textContent = 'Detection active 🔍';
             statusDiv.style.color = '#10b981';
-
+            
             // Run detection every 500ms
             detectionInterval = setInterval(detectObjects, 500);
         }
@@ -198,12 +199,12 @@
             detectionActive = false;
             detectBtn.textContent = 'Start Detection';
             detectBtn.style.backgroundColor = '#4f46e5';
-
+            
             if (detectionInterval) {
                 clearInterval(detectionInterval);
                 detectionInterval = null;
             }
-
+            
             ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
             detectionInfo.textContent = 'Detection stopped';
             statusDiv.textContent = 'Camera active ✓';
@@ -244,38 +245,27 @@
                 ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
                 // Draw detection boxes
-                result.detections.forEach(detection => {
-                        const { x, y, width, height } = detection.box;
+                if (result.detections && result.detections.length > 0) {
+                    ctx.lineWidth = 3;
+                    ctx.font = '16px sans-serif';
 
+                    result.detections.forEach(detection => {
+                        const { x, y, width, height } = detection.box;
+                        
                         // Use custom color if provided, otherwise default
                         const color = detection.color || '#3b82f6';
                         ctx.strokeStyle = color;
                         ctx.fillStyle = color;
-
-                        // Draw shape based on detection type
-                        if (detection.shape === 'circle') {
-                            // Draw circle (center point + radius)
-                            const centerX = x + width / 2;
-                            const centerY = y + height / 2;
-                            const radius = width / 2;
-
-                            ctx.beginPath();
-                            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-                            ctx.stroke();
-                        } else {
-                            // Draw rectangle (fallback)
-                            ctx.strokeRect(x, y, width, height);
-                        }
-
+                        
+                        // Draw rectangle
+                        ctx.strokeRect(x, y, width, height);
+                        
                         // Draw label with background
                         const label = `${detection.label} ${Math.round(detection.confidence * 100)}%`;
                         const textWidth = ctx.measureText(label).width;
-
-                        // Draw background for text
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
                         ctx.fillRect(x, y - 25, textWidth + 10, 20);
-
-                        // Draw text
-                        ctx.fillStyle = 'white';
+                        ctx.fillStyle = color;
                         ctx.fillText(label, x + 5, y - 10);
                     });
 
@@ -284,17 +274,16 @@
                     result.detections.forEach(d => {
                         counts[d.label] = (counts[d.label] || 0) + 1;
                     });
-
+                    
                     // Build message
                     const messages = Object.entries(counts).map(([label, count]) => 
                         `${count} ${label}${count > 1 ? 's' : ''}`
                     );
-
+                    
                     detectionInfo.textContent = `Detected: ${messages.join(', ')}`;
                 } else {
                     detectionInfo.textContent = 'No objects detected';
                 }
-
             } catch (error) {
                 console.error('Fetch error:', error);
                 detectionInfo.textContent = `Network error: ${error.message}`;
