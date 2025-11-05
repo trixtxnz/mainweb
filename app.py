@@ -157,27 +157,22 @@ def detect_objects():
 
         # Define cascade paths (custom cascades first, then fallback to built-in)
         cascade_configs = [
-            {'name': 'Face', 'paths': ['cascades/face.xml',
-                                       'cascades/haarcascade_frontalface_alt2.xml', 
+            {'name': 'Face', 'paths': ['cascades/haarcascade_frontalface_alt2.xml', 
+                                       'cascades/face.xml',
                                        cv2.data.haarcascades + 'haarcascade_frontalface_alt2.xml',
                                        cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'],
-             'color': '#3b82f6', 'shape': 'circle', 'params': {'scaleFactor': 1.05, 'minNeighbors': 5, 'minSize': (50, 50), 'flags': cv2.CASCADE_SCALE_IMAGE}},
+             'color': '#10b981', 'params': {'scaleFactor': 1.05, 'minNeighbors': 6, 'minSize': (50, 50)}},
             
             {'name': 'Hand', 'paths': ['cascades/hand.xml',
-                                       'cascades/Hand.Cascade.1.xml'],
-             'color': '#10b981', 'shape': 'circle', 'params': {'scaleFactor': 1.05, 'minNeighbors': 4, 'minSize': (40, 40), 'flags': cv2.CASCADE_SCALE_IMAGE}},
-            
-            {'name': 'Palm', 'paths': ['cascades/palm.xml'],
-             'color': '#8b5cf6', 'shape': 'circle', 'params': {'scaleFactor': 1.05, 'minNeighbors': 4, 'minSize': (40, 40), 'flags': cv2.CASCADE_SCALE_IMAGE}}
+                                       'cascades/Hand.Cascade.1.xml',
+                                       'cascades/palm.xml'],
+             'color': '#f59e0b', 'params': {'scaleFactor': 1.05, 'minNeighbors': 4, 'minSize': (40, 40)}}
         ]
 
         # Convert to grayscale and enhance image quality
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization) for better contrast
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        gray = clahe.apply(gray)
-        # Reduce noise
-        gray = cv2.bilateralFilter(gray, 9, 75, 75)
+        gray = cv2.equalizeHist(gray)
+        gray = cv2.GaussianBlur(gray, (3, 3), 0)
 
         # Prepare detection results
         detections = []
@@ -200,16 +195,15 @@ def detect_objects():
                     scaleFactor=config['params']['scaleFactor'],
                     minNeighbors=config['params']['minNeighbors'],
                     minSize=config['params']['minSize'],
-                    flags=config['params'].get('flags', cv2.CASCADE_SCALE_IMAGE)
+                    flags=cv2.CASCADE_SCALE_IMAGE
                 )
                 
-                # Add detections (will find biggest object per type)
+                # Add detections
                 for (x, y, w, h) in objects:
                     detections.append({
                         'label': config['name'],
-                        'confidence': 0.90 if config['name'] == 'Face' else 0.85,
+                        'confidence': 0.90 if config['name'] == 'Face' else 0.80,
                         'color': config['color'],
-                        'shape': config.get('shape', 'rect'),
                         'box': {
                             'x': int(x),
                             'y': int(y),

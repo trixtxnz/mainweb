@@ -106,7 +106,7 @@
     <div class="info-box">
         <h3>✅ Server-Side Detection</h3>
         <p><strong>This works in Replit workspace!</strong> Frames are sent to the Python backend for processing using OpenCV.</p>
-        <p>Currently detecting: <strong>Faces, Smiles, Hands, Palms, Fists</strong> (using Haar Cascade classifiers)</p>
+        <p>Currently detecting: <strong>Faces and Hands</strong> (using Haar Cascade classifiers)</p>
         <p>Click "Toggle Detection" to start/stop object detection.</p>
         <p><em>Note: Extract custom cascade XML files to a 'cascades/' folder for enhanced detection.</em></p>
     </div>
@@ -284,6 +284,7 @@
                 } else {
                     detectionInfo.textContent = 'No objects detected';
                 }
+
             } catch (error) {
                 console.error('Fetch error:', error);
                 detectionInfo.textContent = `Network error: ${error.message}`;
