@@ -106,8 +106,9 @@
     <div class="info-box">
         <h3>✅ Server-Side Detection</h3>
         <p><strong>This works in Replit workspace!</strong> Frames are sent to the Python backend for processing using OpenCV.</p>
-        <p>Currently detecting: <strong>Faces & Hands</strong> (using Haar Cascade classifiers)</p>
+        <p>Currently detecting: <strong>Faces, Smiles, Hands, Palms, Fists</strong> (using Haar Cascade classifiers)</p>
         <p>Click "Toggle Detection" to start/stop object detection.</p>
+        <p><em>Note: Extract custom cascade XML files to a 'cascades/' folder for enhanced detection.</em></p>
     </div>
 
     <script>
@@ -251,41 +252,37 @@
                     result.detections.forEach(detection => {
                         const { x, y, width, height } = detection.box;
                         
-                        // Use different colors for different objects
-                        if (detection.label === 'Face') {
-                            ctx.strokeStyle = '#10b981'; // green for faces
-                            ctx.fillStyle = '#10b981';
-                        } else if (detection.label === 'Hand') {
-                            ctx.strokeStyle = '#f59e0b'; // orange for hands
-                            ctx.fillStyle = '#f59e0b';
-                        } else {
-                            ctx.strokeStyle = '#3b82f6'; // blue for other objects
-                            ctx.fillStyle = '#3b82f6';
-                        }
+                        // Use custom color if provided, otherwise default
+                        const color = detection.color || '#3b82f6';
+                        ctx.strokeStyle = color;
+                        ctx.fillStyle = color;
                         
                         // Draw rectangle
                         ctx.strokeRect(x, y, width, height);
                         
-                        // Draw label
+                        // Draw label with background
                         const label = `${detection.label} ${Math.round(detection.confidence * 100)}%`;
-                        ctx.fillText(label, x, y - 5);
+                        const textWidth = ctx.measureText(label).width;
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                        ctx.fillRect(x, y - 25, textWidth + 10, 20);
+                        ctx.fillStyle = color;
+                        ctx.fillText(label, x + 5, y - 10);
                     });
 
-                    // Count faces and hands separately
-                    const faceCount = result.detections.filter(d => d.label === 'Face').length;
-                    const handCount = result.detections.filter(d => d.label === 'Hand').length;
+                    // Count different detection types
+                    const counts = {};
+                    result.detections.forEach(d => {
+                        counts[d.label] = (counts[d.label] || 0) + 1;
+                    });
                     
-                    let message = '';
-                    if (faceCount > 0 && handCount > 0) {
-                        message = `Detected ${faceCount} face(s) and ${handCount} hand(s)`;
-                    } else if (faceCount > 0) {
-                        message = `Detected ${faceCount} face(s)`;
-                    } else if (handCount > 0) {
-                        message = `Detected ${handCount} hand(s)`;
-                    }
-                    detectionInfo.textContent = message;
+                    // Build message
+                    const messages = Object.entries(counts).map(([label, count]) => 
+                        `${count} ${label}${count > 1 ? 's' : ''}`
+                    );
+                    
+                    detectionInfo.textContent = `Detected: ${messages.join(', ')}`;
                 } else {
-                    detectionInfo.textContent = 'No faces or hands detected';
+                    detectionInfo.textContent = 'No objects detected';
                 }
 
             } catch (error) {

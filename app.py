@@ -155,80 +155,76 @@ def detect_objects():
         if frame is None:
             return jsonify({'error': 'Failed to decode image'}), 400
 
-        # Load improved face detector (Haar Cascade)
-        # Using alt2 version which is more accurate than default
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_alt2.xml')
-
-        # Fallback to default if alt2 not available
-        if face_cascade.empty():
-            face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-
-        # Load hand detector (Haar Cascade)
-        # Note: OpenCV doesn't include a hand cascade by default, so we'll use a workaround
-        # We'll use the fist cascade which can detect hand-like objects
-        hand_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_hand.xml')
-        
-        # If hand cascade not available, try fist detection as alternative
-        if hand_cascade.empty():
-            hand_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_fist.xml')
+        # Define cascade paths (custom cascades first, then fallback to built-in)
+        cascade_configs = [
+            {'name': 'Face', 'paths': ['cascades/haarcascade_frontalface_alt2.xml', 
+                                       cv2.data.haarcascades + 'haarcascade_frontalface_alt2.xml',
+                                       cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'],
+             'color': '#10b981', 'params': {'scaleFactor': 1.05, 'minNeighbors': 6, 'minSize': (50, 50)}},
+            
+            {'name': 'Smile', 'paths': ['cascades/haarcascade_smile.xml',
+                                        cv2.data.haarcascades + 'haarcascade_smile.xml'],
+             'color': '#ec4899', 'params': {'scaleFactor': 1.1, 'minNeighbors': 20, 'minSize': (25, 25)}},
+            
+            {'name': 'Hand', 'paths': ['cascades/haarcascade_hand.xml',
+                                       'cascades/palm.xml'],
+             'color': '#f59e0b', 'params': {'scaleFactor': 1.1, 'minNeighbors': 4, 'minSize': (30, 30)}},
+            
+            {'name': 'Palm', 'paths': ['cascades/palm.xml',
+                                       'cascades/aGest.xml'],
+             'color': '#8b5cf6', 'params': {'scaleFactor': 1.1, 'minNeighbors': 5, 'minSize': (40, 40)}},
+            
+            {'name': 'Fist', 'paths': ['cascades/fist.xml',
+                                       'cascades/haarcascade_fist.xml'],
+             'color': '#ef4444', 'params': {'scaleFactor': 1.1, 'minNeighbors': 4, 'minSize': (30, 30)}}
+        ]
 
         # Convert to grayscale and enhance image quality
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-        # Apply histogram equalization to improve contrast
         gray = cv2.equalizeHist(gray)
-
-        # Optional: Reduce noise with Gaussian blur
         gray = cv2.GaussianBlur(gray, (3, 3), 0)
-
-        # Detect faces with improved parameters
-        faces = face_cascade.detectMultiScale(
-            gray, 
-            scaleFactor=1.05,      # More thorough scanning
-            minNeighbors=6,        # Require more overlapping detections
-            minSize=(50, 50),      # Ignore very small faces
-            flags=cv2.CASCADE_SCALE_IMAGE
-        )
-
-        # Detect hands (if cascade is available)
-        hands = []
-        if not hand_cascade.empty():
-            hands = hand_cascade.detectMultiScale(
-                gray,
-                scaleFactor=1.1,
-                minNeighbors=4,
-                minSize=(30, 30),
-                flags=cv2.CASCADE_SCALE_IMAGE
-            )
 
         # Prepare detection results
         detections = []
         
-        # Add face detections
-        for (x, y, w, h) in faces:
-            detections.append({
-                'label': 'Face',
-                'confidence': 0.95,
-                'box': {
-                    'x': int(x),
-                    'y': int(y),
-                    'width': int(w),
-                    'height': int(h)
-                }
-            })
-        
-        # Add hand detections
-        for (x, y, w, h) in hands:
-            detections.append({
-                'label': 'Hand',
-                'confidence': 0.85,
-                'box': {
-                    'x': int(x),
-                    'y': int(y),
-                    'width': int(w),
-                    'height': int(h)
-                }
-            })
+        # Try each cascade configuration
+        for config in cascade_configs:
+            cascade = None
+            
+            # Try each path until one loads successfully
+            for path in config['paths']:
+                test_cascade = cv2.CascadeClassifier(path)
+                if not test_cascade.empty():
+                    cascade = test_cascade
+                    break
+            
+            # If cascade loaded, perform detection
+            if cascade is not None and not cascade.empty():
+                objects = cascade.detectMultiScale(
+                    gray,
+                    scaleFactor=config['params']['scaleFactor'],
+                    minNeighbors=config['params']['minNeighbors'],
+                    minSize=config['params']['minSize'],
+                    flags=cv2.CASCADE_SCALE_IMAGE
+                )
+                
+                # Add detections
+                for (x, y, w, h) in objects:
+                    # Skip smile detections that are too large (likely false positives)
+                    if config['name'] == 'Smile' and (w > 150 or h > 150):
+                        continue
+                        
+                    detections.append({
+                        'label': config['name'],
+                        'confidence': 0.90 if config['name'] == 'Face' else 0.80,
+                        'color': config['color'],
+                        'box': {
+                            'x': int(x),
+                            'y': int(y),
+                            'width': int(w),
+                            'height': int(h)
+                        }
+                    })
 
         return jsonify({
             'detections': detections,
