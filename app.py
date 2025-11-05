@@ -157,26 +157,18 @@ def detect_objects():
 
         # Define cascade paths (custom cascades first, then fallback to built-in)
         cascade_configs = [
-            {'name': 'Face', 'paths': ['cascades/haarcascade_frontalface_alt2.xml', 
+            {'name': 'Face', 'paths': ['cascades/face.xml',
+                                       'cascades/haarcascade_frontalface_alt2.xml', 
                                        cv2.data.haarcascades + 'haarcascade_frontalface_alt2.xml',
                                        cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'],
-             'color': '#10b981', 'params': {'scaleFactor': 1.05, 'minNeighbors': 6, 'minSize': (50, 50)}},
+             'color': '#3b82f6', 'shape': 'circle', 'params': {'scaleFactor': 1.1, 'minNeighbors': 3, 'minSize': (30, 30), 'flags': cv2.CASCADE_FIND_BIGGEST_OBJECT}},
             
-            {'name': 'Smile', 'paths': ['cascades/haarcascade_smile.xml',
-                                        cv2.data.haarcascades + 'haarcascade_smile.xml'],
-             'color': '#ec4899', 'params': {'scaleFactor': 1.1, 'minNeighbors': 20, 'minSize': (25, 25)}},
+            {'name': 'Hand', 'paths': ['cascades/hand.xml',
+                                       'cascades/Hand.Cascade.1.xml'],
+             'color': '#10b981', 'shape': 'circle', 'params': {'scaleFactor': 1.1, 'minNeighbors': 3, 'minSize': (30, 30), 'flags': cv2.CASCADE_FIND_BIGGEST_OBJECT}},
             
-            {'name': 'Hand', 'paths': ['cascades/haarcascade_hand.xml',
-                                       'cascades/palm.xml'],
-             'color': '#f59e0b', 'params': {'scaleFactor': 1.1, 'minNeighbors': 4, 'minSize': (30, 30)}},
-            
-            {'name': 'Palm', 'paths': ['cascades/palm.xml',
-                                       'cascades/aGest.xml'],
-             'color': '#8b5cf6', 'params': {'scaleFactor': 1.1, 'minNeighbors': 5, 'minSize': (40, 40)}},
-            
-            {'name': 'Fist', 'paths': ['cascades/fist.xml',
-                                       'cascades/haarcascade_fist.xml'],
-             'color': '#ef4444', 'params': {'scaleFactor': 1.1, 'minNeighbors': 4, 'minSize': (30, 30)}}
+            {'name': 'Palm', 'paths': ['cascades/palm.xml'],
+             'color': '#8b5cf6', 'shape': 'circle', 'params': {'scaleFactor': 1.1, 'minNeighbors': 3, 'minSize': (30, 30), 'flags': cv2.CASCADE_FIND_BIGGEST_OBJECT}}
         ]
 
         # Convert to grayscale and enhance image quality
@@ -205,19 +197,16 @@ def detect_objects():
                     scaleFactor=config['params']['scaleFactor'],
                     minNeighbors=config['params']['minNeighbors'],
                     minSize=config['params']['minSize'],
-                    flags=cv2.CASCADE_SCALE_IMAGE
+                    flags=config['params'].get('flags', cv2.CASCADE_SCALE_IMAGE)
                 )
                 
-                # Add detections
+                # Add detections (will find biggest object per type)
                 for (x, y, w, h) in objects:
-                    # Skip smile detections that are too large (likely false positives)
-                    if config['name'] == 'Smile' and (w > 150 or h > 150):
-                        continue
-                        
                     detections.append({
                         'label': config['name'],
-                        'confidence': 0.90 if config['name'] == 'Face' else 0.80,
+                        'confidence': 0.90 if config['name'] == 'Face' else 0.85,
                         'color': config['color'],
+                        'shape': config.get('shape', 'rect'),
                         'box': {
                             'x': int(x),
                             'y': int(y),
