@@ -40,20 +40,6 @@
             margin-bottom: 10px;
             font-size: 0.8rem;
         }
-        
-        .temp-settings {
-            margin-top: 5px;
-            font-size: 0.65rem;
-            color: #ff8c00; 
-            line-height: 1.2;
-        }
-
-        .mega-settings {
-            margin-top: 5px;
-            font-size: 0.65rem;
-            color: #ff0000;
-            line-height: 1.2;
-        }
 
         .controls {
             margin-top: 20px;
@@ -72,8 +58,6 @@
 
     <div class="game-info">
         <div id="status-message" style="color: #48e42f;">Use controls to reach the gem!</div>
-        <div id="temp-proj-settings" class="temp-settings"></div>
-        <div id="mega-proj-settings" class="mega-settings"></div>
     </div>
 
     <div id="game-container">
@@ -89,8 +73,6 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const STATUS_MESSAGE = document.getElementById('status-message');
-        const TEMP_PROJ_DISPLAY = document.getElementById('temp-proj-settings');
-        const MEGA_PROJ_DISPLAY = document.getElementById('mega-proj-settings'); // New display element
 
         // NEW DIMENSIONS: Larger game area
         const GAME_WIDTH = 900; 
@@ -968,27 +950,10 @@
             player = new Player(0, 0); 
 
             generateLevel();
-            updateTempSettingsDisplay();
-            updateMegaSettingsDisplay(); // Call new display function
             
             requestAnimationFrame(gameLoop);
         }
         
-        function updateTempSettingsDisplay() {
-            TEMP_PROJ_DISPLAY.innerHTML = 
-                'Timed Laser: Speed: ' + TEMP_PROJ_SPEED + ' | Radius: ' + TEMP_PROJ_RADIUS + ' | Color: ' + TEMP_PROJ_COLOR + '<br>' +
-                '<b>Lifespan: ' + TURRET_LIFESPAN_MS + 'ms</b> | <b>Refill Cooldown: ' + TEMPORARY_TURRET_SPAWN_COOLDOWN_MS + 'ms</b> | <b>Max Active: ' + MAX_ACTIVE_TEMPORARY_TURRETS + '</b>';
-        }
-
-        // --- NEW FUNCTION: Mega Settings Display ---
-        function updateMegaSettingsDisplay() {
-            MEGA_PROJ_DISPLAY.innerHTML = 
-                'MEGA Turret: Fire Cooldown: ' + MEGA_TURRET_FIRE_COOLDOWN + 'ms | Big Proj Speed: ' + MEGA_PROJECTILE_SPEED + ' | Big Proj Radius: ' + MEGA_PROJECTILE_RADIUS + '<br>' +
-                '<b>Lifespan: ' + MEGA_TURRET_LIFESPAN_MS + 'ms</b> | <b>Spawn Cooldown: ' + MEGA_TURRET_SPAWN_COOLDOWN_MS + 'ms</b> | <b>Max Active: ' + MAX_ACTIVE_MEGA_TURRETS + '</b><br>' +
-                '<b>Explosion:</b> Count: ' + MINI_PROJECTILE_COUNT + ' | Mini Proj Speed: ' + MINI_PROJECTILE_SPEED + ' | Mini Proj Radius: ' + MINI_PROJECTILE_RADIUS + ' | Color: ' + MINI_PROJECTILE_COLOR;
-        }
-        // ------------------------------------------
-
         // --- Collision and Physics Logic ---
 
         function checkPlatformCollision() {
