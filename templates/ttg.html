@@ -125,12 +125,17 @@
         const MEGA_PROJECTILE_RADIUS = 12; // Bigger ball radius
         const MEGA_PROJECTILE_COLOR = '#ff0000'; // Red color
         const MEGA_PROJECTILE_SPEED = 5;
-        const MEGA_TURRET_COOLDOWN = 4000; // Slow firing rate
+        const MEGA_TURRET_FIRE_COOLDOWN = 4000; // Slow firing rate
         
         const MINI_PROJECTILE_COUNT = 8; // Number of smaller projectiles
         const MINI_PROJECTILE_RADIUS = 3; // Tiny projectile size
         const MINI_PROJECTILE_SPEED = 5; // Fast spread speed
         const MINI_PROJECTILE_COLOR = '#ffc300'; // Gold color
+        
+        // Mega Turret Spawn Settings
+        const MEGA_TURRET_LIFESPAN_MS = 5000; // How long mega turret stays alive
+        const MEGA_TURRET_SPAWN_COOLDOWN_MS = 3000; // Time between spawning new mega turrets
+        const MAX_ACTIVE_MEGA_TURRETS = 3; // Maximum number of mega turrets at once
 
         // Safety Zone Constant
         const START_ZONE_CLEARANCE = 150; // Minimum vertical clearance (in pixels) from player's start Y position.
@@ -157,7 +162,7 @@
         let temporaryTurretCooldown = TEMPORARY_TURRET_SPAWN_COOLDOWN_MS; 
         
         // Mega Turret Management
-        let megaTurretCooldown = MEGA_TURRET_COOLDOWN;
+        let megaTurretCooldown = MEGA_TURRET_SPAWN_COOLDOWN_MS;
         
         // --- Game Objects (Classes) ---
         
@@ -393,7 +398,7 @@
 
                 if (this.isMegaTurret) {
                     this.color = '#330000'; // Darker red/black for mega turret base
-                    this.fireCooldown = MEGA_TURRET_COOLDOWN;
+                    this.fireCooldown = MEGA_TURRET_FIRE_COOLDOWN;
                 } else if (this.isTemporary) {
                     this.color = '#ff00ff'; // Magenta for temporary
                     this.fireCooldown = 2000;
@@ -406,8 +411,14 @@
 
                 this.timeUntilNextShot = 0; 
                 
-                // Use the new TURRET_LIFESPAN_MS constant
-                this.despawnTimer = isTemporary ? TURRET_LIFESPAN_MS : Infinity; 
+                // Use the lifespan constants
+                if (this.isMegaTurret) {
+                    this.despawnTimer = MEGA_TURRET_LIFESPAN_MS;
+                } else if (this.isTemporary) {
+                    this.despawnTimer = TURRET_LIFESPAN_MS;
+                } else {
+                    this.despawnTimer = Infinity;
+                }
                 this.hasFired = false;
 
                 this.minX = minX;
@@ -511,8 +522,8 @@
                     }
                 }
                 
-                // 3. Despawn Logic (for temporary turrets)
-                if (this.isTemporary) {
+                // 3. Despawn Logic (for temporary and mega turrets)
+                if (this.isTemporary || this.isMegaTurret) {
                     if (this.hasFired) {
                         this.despawnTimer -= deltaTime;
                         if (this.despawnTimer <= 0) {
@@ -786,6 +797,11 @@
 
         // Function to spawn a single mega turret on the wall
         function spawnMegaTurret() {
+            // Check if we've reached the maximum number of active mega turrets
+            if (megaTurrets.length >= MAX_ACTIVE_MEGA_TURRETS) {
+                return;
+            }
+            
             const turretWidth = 30;
             const turretHeight = 10;
             
@@ -938,7 +954,7 @@
             projectiles = []; 
             // Initialize cooldown to 0 so the first batch spawns instantly on the first frame
             temporaryTurretCooldown = 0;
-            megaTurretCooldown = MEGA_TURRET_COOLDOWN; // Start with full cooldown for mega turrets
+            megaTurretCooldown = MEGA_TURRET_SPAWN_COOLDOWN_MS; // Start with full cooldown for mega turrets
             
             player = new Player(0, 0); 
 
@@ -950,18 +966,17 @@
         }
         
         function updateTempSettingsDisplay() {
-            TEMP_PROJ_DISPLAY.innerHTML = `
-                Timed Laser: Speed: ${TEMP_PROJ_SPEED} | Radius: ${TEMP_PROJ_RADIUS} | Color: ${TEMP_PROJ_COLOR}<br>
-                **Lifespan: ${TURRET_LIFESPAN_MS}ms** | **Refill Cooldown: ${TEMPORARY_TURRET_SPAWN_COOLDOWN_MS}ms** | **Max Active: ${MAX_ACTIVE_TEMPORARY_TURRETS}**
-            `;
+            TEMP_PROJ_DISPLAY.innerHTML = 
+                'Timed Laser: Speed: ' + TEMP_PROJ_SPEED + ' | Radius: ' + TEMP_PROJ_RADIUS + ' | Color: ' + TEMP_PROJ_COLOR + '<br>' +
+                '<b>Lifespan: ' + TURRET_LIFESPAN_MS + 'ms</b> | <b>Refill Cooldown: ' + TEMPORARY_TURRET_SPAWN_COOLDOWN_MS + 'ms</b> | <b>Max Active: ' + MAX_ACTIVE_TEMPORARY_TURRETS + '</b>';
         }
 
         // --- NEW FUNCTION: Mega Settings Display ---
         function updateMegaSettingsDisplay() {
-            MEGA_PROJ_DISPLAY.innerHTML = `
-                MEGA Turret: Cooldown: ${MEGA_TURRET_COOLDOWN}ms | Big Proj Speed: ${MEGA_PROJECTILE_SPEED} | Big Proj Radius: ${MEGA_PROJECTILE_RADIUS}<br>
-                **Explosion:** Count: ${MINI_PROJECTILE_COUNT} | Mini Proj Speed: ${MINI_PROJECTILE_SPEED} | Mini Proj Radius: ${MINI_PROJECTILE_RADIUS} | Color: ${MINI_PROJECTILE_COLOR}
-            `;
+            MEGA_PROJ_DISPLAY.innerHTML = 
+                'MEGA Turret: Fire Cooldown: ' + MEGA_TURRET_FIRE_COOLDOWN + 'ms | Big Proj Speed: ' + MEGA_PROJECTILE_SPEED + ' | Big Proj Radius: ' + MEGA_PROJECTILE_RADIUS + '<br>' +
+                '<b>Lifespan: ' + MEGA_TURRET_LIFESPAN_MS + 'ms</b> | <b>Spawn Cooldown: ' + MEGA_TURRET_SPAWN_COOLDOWN_MS + 'ms</b> | <b>Max Active: ' + MAX_ACTIVE_MEGA_TURRETS + '</b><br>' +
+                '<b>Explosion:</b> Count: ' + MINI_PROJECTILE_COUNT + ' | Mini Proj Speed: ' + MINI_PROJECTILE_SPEED + ' | Mini Proj Radius: ' + MINI_PROJECTILE_RADIUS + ' | Color: ' + MINI_PROJECTILE_COLOR;
         }
         // ------------------------------------------
 
@@ -1124,12 +1139,16 @@
             megaTurretCooldown -= deltaTime;
             if (megaTurretCooldown <= 0) {
                 spawnMegaTurret();
-                megaTurretCooldown = MEGA_TURRET_COOLDOWN;
+                megaTurretCooldown = MEGA_TURRET_SPAWN_COOLDOWN_MS;
             }
 
             // 3. Update Turrets (Normal, Temporary, and Mega)
             turrets.forEach(t => t.update(deltaTime, projectiles));
-            megaTurrets.forEach(t => t.update(deltaTime, projectiles));
+            
+            megaTurrets = megaTurrets.filter(t => {
+                t.update(deltaTime, projectiles);
+                return !t.isDead;
+            });
 
             temporaryTurrets = temporaryTurrets.filter(t => {
                 t.update(deltaTime, projectiles);
