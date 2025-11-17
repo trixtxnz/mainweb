@@ -40,7 +40,7 @@
             margin-bottom: 10px;
             font-size: 0.8rem;
         }
-        
+
         .temp-settings {
             margin-top: 5px;
             font-size: 0.65rem;
@@ -106,12 +106,12 @@
         const PLAYER_MOVE_SPEED = 5;
         const JUMP_VELOCITY = -10;
         const WALL_JUMP_X_VELOCITY = 8; 
-        
+
         // --- PERMANENT TURRET PROJECTILE SETTINGS ---
         const PROJECTILE_SPEED = 8; 
         const PROJECTILE_COLOR = '#ff4500'; 
         const PROJECTILE_RADIUS = 5;
-        
+
         // --- TEMPORARY TURRET SETTINGS (CUSTOMIZABLE) ---
         const TEMP_PROJ_SPEED = 4;    
         const TEMP_PROJ_COLOR = '#ff8c00'; 
@@ -120,20 +120,23 @@
         const TURRET_LIFESPAN_MS = 2000;
         const TEMPORARY_TURRET_SPAWN_COOLDOWN_MS = 50; 
         const MAX_ACTIVE_TEMPORARY_TURRETS = 6; 
-        
+
         // --- MEGA TURRET/PROJECTILE SETTINGS (NEW) ---
         const MEGA_PROJECTILE_RADIUS = 12; // Bigger ball radius
         const MEGA_PROJECTILE_COLOR = '#ff0000'; // Red color
         const MEGA_PROJECTILE_SPEED = 5;
         const MEGA_TURRET_COOLDOWN = 4000; // Slow firing rate
-        const MEGA_TURRET_LIFESPAN_MS = 3000; // How long mega turrets stay after firing
-        const MEGA_TURRET_SPAWN_COOLDOWN_MS = 100;
-        const MAX_ACTIVE_MEGA_TURRETS = 3;
-        
+
         const MINI_PROJECTILE_COUNT = 8; // Number of smaller projectiles
         const MINI_PROJECTILE_RADIUS = 3; // Tiny projectile size
         const MINI_PROJECTILE_SPEED = 5; // Fast spread speed
         const MINI_PROJECTILE_COLOR = '#ffc300'; // Gold color
+
+        // --- NEW MEGA TURRET SPAWN SETTINGS ---
+        const MEGA_TURRET_LIFESPAN_MS = 3000; // How long mega turrets last
+        const MEGA_TURRET_SPAWN_COOLDOWN_MS = 10000; // Time between mega turret spawns
+        const MAX_ACTIVE_MEGA_TURRETS = 2; // Max number of mega turrets at once
+
 
         // Safety Zone Constant
         const START_ZONE_CLEARANCE = 150; // Minimum vertical clearance (in pixels) from player's start Y position.
@@ -157,11 +160,12 @@
         let lastTime = 0;
 
         // Temporary Turret Management
-        let temporaryTurretCooldown = TEMPORARY_TURRET_SPAWN_COOLDOWN_MS;
-        let megaTurretCooldown = MEGA_TURRET_SPAWN_COOLDOWN_MS; 
-        
+        let temporaryTurretCooldown = TEMPORARY_TURRET_SPAWN_COOLDOWN_MS; 
+        let megaTurretSpawnCooldown = MEGA_TURRET_SPAWN_COOLDOWN_MS; // New cooldown for mega turrets
+
+
         // --- Game Objects (Classes) ---
-        
+
         class Player {
             // ... (Player class remains unchanged) ...
             constructor(x, y) {
@@ -360,7 +364,7 @@
                 ctx.shadowOffsetX = 0;
                 ctx.shadowOffsetY = 0;
             }
-        
+
             // --- NEW FUNCTION: Explosion Logic ---
             explodeIntoMiniProjectiles() {
                 const miniProjectiles = [];
@@ -395,26 +399,22 @@
                 if (this.isMegaTurret) {
                     this.color = '#330000'; // Darker red/black for mega turret base
                     this.fireCooldown = MEGA_TURRET_COOLDOWN;
+                    this.lifespan = MEGA_TURRET_LIFESPAN_MS; // New lifespan property
                 } else if (this.isTemporary) {
                     this.color = '#ff00ff'; // Magenta for temporary
                     this.fireCooldown = 2000;
+                    this.lifespan = TURRET_LIFESPAN_MS; // Use existing constant
                 } else {
                     this.color = '#7f0000'; // Dark Red for permanent
                     this.fireCooldown = 2000;
+                    this.lifespan = Infinity; // Permanent turrets don't despawn
                 }
-                
-                this.isDead = false;
 
-                this.timeUntilNextShot = 0; 
-                
-                // Use appropriate lifespan based on turret type
-                if (this.isMegaTurret && isTemporary) {
-                    this.despawnTimer = MEGA_TURRET_LIFESPAN_MS;
-                } else if (isTemporary) {
-                    this.despawnTimer = TURRET_LIFESPAN_MS;
-                } else {
-                    this.despawnTimer = Infinity;
-                }
+                this.isDead = false;
+                this.timeUntilNextShot = Math.random() * this.fireCooldown; // Stagger initial shots
+
+                // Use the new TURRET_LIFESPAN_MS constant
+                this.despawnTimer = isTemporary ? this.lifespan : Infinity; 
                 this.hasFired = false;
 
                 this.minX = minX;
@@ -425,6 +425,7 @@
                 this.isMovingX = this.minX !== this.maxX; 
                 this.isMovingY = this.minY !== this.maxY; 
 
+                // Ensure only one axis of movement
                 if (this.isMovingX && this.isMovingY) {
                     this.isMovingY = false;
                 }
@@ -487,7 +488,7 @@
                         // Temporary turrets fire once
                     } else {
                         const muzzle = this.getMuzzlePosition();
-                        
+
                         let projSpeed = PROJECTILE_SPEED;
                         let projColor = PROJECTILE_COLOR;
                         let projRadius = PROJECTILE_RADIUS;
@@ -509,22 +510,20 @@
 
                         projectiles.push(new Projectile(muzzle.x, muzzle.y, this.angle, projSpeed, projColor, projRadius, isMega));
                         this.hasFired = true;
-                        
+
                         if (!this.isTemporary) {
                             this.timeUntilNextShot = this.fireCooldown; 
                         } else {
-                            this.timeUntilNextShot = 9999999; 
+                            this.timeUntilNextShot = 9999999; // Prevent further firing
                         }
                     }
                 }
-                
-                // 3. Despawn Logic (for temporary turrets)
-                if (this.isTemporary) {
-                    if (this.hasFired) {
-                        this.despawnTimer -= deltaTime;
-                        if (this.despawnTimer <= 0) {
-                            this.isDead = true;
-                        }
+
+                // 3. Despawn Logic (for temporary and mega turrets)
+                if (this.isTemporary || this.isMegaTurret) {
+                    this.despawnTimer -= deltaTime;
+                    if (this.despawnTimer <= 0) {
+                        this.isDead = true;
                     }
                 }
             }
@@ -553,7 +552,7 @@
                 ctx.shadowBlur = 0; 
             }
         }
-        
+
         // --- Level Data (Modules) ---
         const LevelModules = [
             // Module 1: Two small platforms high and low (NO TURRET) - Updated for higher platform
@@ -709,6 +708,97 @@
                     [100, GAME_HEIGHT - 250 - 25],
                 ]
             },
+             // Module 11: Platform with a Mega Turret firing upwards
+            {
+                moduleWidth: 200,
+                platforms: [
+                    [20, GAME_HEIGHT - 200, 160, 15] // High platform
+                ],
+                turrets: [],
+                megaTurrets: [
+                    // Mega Turret firing upwards (angle -Math.PI / 2) from the middle of the platform
+                    [100, GAME_HEIGHT - 200 - 10, -Math.PI / 2, 0, 0, 0, 0, 0] 
+                ],
+                spawnPoints: [
+                    [50, GAME_HEIGHT - 200 - 25], 
+                    [150, GAME_HEIGHT - 200 - 25]
+                ]
+            },
+            // Module 12: Platform with a Mega Turret firing downwards
+            {
+                moduleWidth: 200,
+                platforms: [
+                    [20, GAME_HEIGHT - 200, 160, 15] // High platform
+                ],
+                turrets: [],
+                megaTurrets: [
+                    // Mega Turret firing downwards (angle Math.PI / 2) from the middle of the platform
+                    [100, GAME_HEIGHT - 200 - 10, Math.PI / 2, 0, 0, 0, 0, 0] 
+                ],
+                spawnPoints: [
+                    [50, GAME_HEIGHT - 200 - 25], 
+                    [150, GAME_HEIGHT - 200 - 25]
+                ]
+            },
+            // Module 13: Multiple platforms with a Mega Turret on the right
+            {
+                moduleWidth: 300,
+                platforms: [
+                    [20, GAME_HEIGHT - 100, 50, 10],
+                    [90, GAME_HEIGHT - 200, 50, 10],
+                    [160, GAME_HEIGHT - 300, 50, 10]
+                ],
+                turrets: [],
+                megaTurrets: [
+                    // Mega Turret firing left from the far right platform
+                    [200, GAME_HEIGHT - 300 - 10, Math.PI, 0, 0, 0, 0, 0] 
+                ],
+                spawnPoints: [
+                    [30, GAME_HEIGHT - 100 - 25],
+                    [100, GAME_HEIGHT - 200 - 25],
+                    [170, GAME_HEIGHT - 300 - 25]
+                ]
+            },
+            // Module 14: A series of platforms with a Mega Turret above
+            {
+                moduleWidth: 250,
+                platforms: [
+                    [20, GAME_HEIGHT - 100, 50, 10],
+                    [90, GAME_HEIGHT - 180, 50, 10],
+                    [160, GAME_HEIGHT - 260, 50, 10]
+                ],
+                turrets: [],
+                megaTurrets: [
+                    // Mega Turret positioned above, firing downwards
+                    [120, GAME_HEIGHT - 300, Math.PI / 2, 0, 0, 0, 0, 0] 
+                ],
+                spawnPoints: [
+                    [30, GAME_HEIGHT - 100 - 25],
+                    [100, GAME_HEIGHT - 180 - 25],
+                    [170, GAME_HEIGHT - 260 - 25]
+                ]
+            },
+            // Module 15: Final challenge area with a Mega Turret
+            {
+                moduleWidth: 350,
+                platforms: [
+                    [20, GAME_HEIGHT - 100, 50, 10],
+                    [90, GAME_HEIGHT - 200, 50, 10],
+                    [160, GAME_HEIGHT - 300, 50, 10],
+                    [230, GAME_HEIGHT - 380, 50, 10] // Very high platform
+                ],
+                turrets: [],
+                megaTurrets: [
+                    // Mega Turret firing diagonally down-left from the highest platform
+                    [250, GAME_HEIGHT - 380 - 10, 3 * Math.PI / 4, 0, 0, 0, 0, 0] 
+                ],
+                spawnPoints: [
+                    [30, GAME_HEIGHT - 100 - 25],
+                    [100, GAME_HEIGHT - 200 - 25],
+                    [170, GAME_HEIGHT - 300 - 25],
+                    [240, GAME_HEIGHT - 380 - 25]
+                ]
+            }
         ];
 
 
@@ -717,11 +807,11 @@
             const turretWidth = 30;
             const turretHeight = 10;
             const MIN_SPACING = 30; 
-            
+
             // Boundary definitions for spawning
             const INNER_LEFT_BOUND = WALL_THICKNESS;
             const INNER_RIGHT_BOUND = GAME_WIDTH - WALL_THICKNESS;
-            
+
             // Safe vertical range for the turret's top edge (avoids the top wall and the ground)
             const minY_Safe = WALL_THICKNESS + 10;
             const maxY_Safe = GAME_HEIGHT - GROUND_HEIGHT - turretHeight - 10;
@@ -742,7 +832,7 @@
                 x = INNER_RIGHT_BOUND - turretWidth;
                 angle = Math.PI;
             }
-            
+
             // 2. Find a non-overlapping Y position
             let y = null;
             let attempts = 0;
@@ -755,9 +845,9 @@
                 attempts++;
                 // Pick a random Y within the safe range
                 const potentialY = Math.random() * verticalRange + minY_Safe;
-                
+
                 let isOverlapping = false;
-                
+
                 // Check against player starting location if spawning on the left wall
                 if (isLeftWall) {
                     // Check if the turret's top edge (potentialY) is too low and near the player's start Y.
@@ -776,7 +866,7 @@
                             const newTurretBottom = potentialY + turretHeight;
                             const existingTurretTop = existingTurret.y;
                             const existingTurretBottom = existingTurret.y + existingTurret.height;
-        
+
                             // Overlap check including MIN_SPACING
                             if (newTurretTop < existingTurretBottom + MIN_SPACING && 
                                 newTurretBottom > existingTurretTop - MIN_SPACING) {
@@ -793,7 +883,7 @@
                     break;
                 }
             } while (y === null && attempts < MAX_ATTEMPTS);
-            
+
             if (y === null) {
                 // Failed to find a spot, return null
                 return null; 
@@ -821,95 +911,60 @@
             }
         }
 
-        // Utility function to add a single mega turret at a non-overlapping spot
-        function addSingleMegaTurret() {
+        // --- NEW FUNCTION: Attempt to spawn a Mega Turret ---
+        function attemptSpawnMegaTurret() {
+            // Only spawn if we haven't reached the max active mega turrets
+            if (megaTurrets.length >= MAX_ACTIVE_MEGA_TURRETS) {
+                return;
+            }
+
             const turretWidth = 30;
             const turretHeight = 10;
-            const MIN_SPACING = 30; 
-            
-            const INNER_LEFT_BOUND = WALL_THICKNESS;
-            const INNER_RIGHT_BOUND = GAME_WIDTH - WALL_THICKNESS;
-            
-            const minY_Safe = WALL_THICKNESS + 10;
-            const maxY_Safe = GAME_HEIGHT - GROUND_HEIGHT - turretHeight - 10;
-            const verticalRange = maxY_Safe - minY_Safe;
+            const MIN_SPACING = 50; // Increased spacing for mega turrets
 
-            const edgeChoice = Math.random() < 0.5 ? 0 : 1; 
-            let x, angle;
-            const isLeftWall = (edgeChoice === 0);
+            // Define safe spawn areas (avoiding player start and edges)
+            const spawnXMin = WALL_THICKNESS + 50;
+            const spawnXMax = GAME_WIDTH - WALL_THICKNESS - 50;
+            const spawnYMin = WALL_THICKNESS + 50;
+            const spawnYMax = GAME_HEIGHT - GROUND_HEIGHT - turretHeight - 50;
 
-            if (isLeftWall) { 
-                x = INNER_LEFT_BOUND;
-                angle = 0;
-            } else { 
-                x = INNER_RIGHT_BOUND - turretWidth;
-                angle = Math.PI;
-            }
-            
-            let y = null;
             let attempts = 0;
-            const MAX_ATTEMPTS = 100; 
+            const MAX_ATTEMPTS = 100;
 
-            const playerStartTopY = GAME_HEIGHT - player.height - GROUND_HEIGHT - 1; 
-
-            do {
+            while (attempts < MAX_ATTEMPTS) {
                 attempts++;
-                const potentialY = Math.random() * verticalRange + minY_Safe;
-                
+
+                const randomX = Math.random() * (spawnXMax - spawnXMin) + spawnXMin;
+                const randomY = Math.random() * (spawnYMax - spawnYMin) + spawnYMin;
+                const randomAngle = Math.random() * Math.PI * 2; // Full circle
+
                 let isOverlapping = false;
-                
-                if (isLeftWall) {
-                    if (potentialY > playerStartTopY - START_ZONE_CLEARANCE) {
+
+                // Check against existing mega turrets
+                for (const existingTurret of megaTurrets) {
+                    const dx = randomX - (existingTurret.x + existingTurret.width / 2);
+                    const dy = randomY - (existingTurret.y + existingTurret.height / 2);
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < (turretWidth / 2 + existingTurret.width / 2 + MIN_SPACING)) {
                         isOverlapping = true;
+                        break;
                     }
                 }
 
                 if (!isOverlapping) {
-                    for (const existingTurret of megaTurrets) {
-                        if (existingTurret.x === x) { 
-                            const newTurretTop = potentialY;
-                            const newTurretBottom = potentialY + turretHeight;
-                            const existingTurretTop = existingTurret.y;
-                            const existingTurretBottom = existingTurret.y + existingTurret.height;
-        
-                            if (newTurretTop < existingTurretBottom + MIN_SPACING && 
-                                newTurretBottom > existingTurretTop - MIN_SPACING) {
-                                isOverlapping = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                if (!isOverlapping) {
-                    y = potentialY;
-                    break;
-                }
-            } while (y === null && attempts < MAX_ATTEMPTS);
-            
-            if (y === null) {
-                return null; 
-            }
-
-            return new Turret(
-                x, y, angle, 
-                x, x, y, y, 0, 
-                false, true
-            );
-        }
-
-        function attemptRefillMegaTurrets() {
-            while (megaTurrets.length < MAX_ACTIVE_MEGA_TURRETS) {
-                const newTurret = addSingleMegaTurret();
-                if (newTurret) {
-                    newTurret.isTemporary = true;
-                    newTurret.despawnTimer = MEGA_TURRET_LIFESPAN_MS;
-                    megaTurrets.push(newTurret);
-                } else {
-                    break; 
+                    // Create and add the new mega turret
+                    megaTurrets.push(new Turret(
+                        randomX, randomY, randomAngle,
+                        randomX, randomX, randomY, randomY, 0, // Stationary for now
+                        false, // Not temporary
+                        true   // Is mega turret
+                    ));
+                    return; // Successfully spawned
                 }
             }
         }
+
 
         // Level Generation Function
         function generateLevel() {
@@ -929,9 +984,9 @@
             player.x = WALL_THICKNESS + 25;
             player.y = GAME_HEIGHT - player.height - GROUND_HEIGHT - 1;
             currentX = player.x + player.width + 50; 
-            
+
             let availableModules = LevelModules; 
-            
+
             // 2. Randomly pick and place modules
             for (let i = 0; i < numModules; i++) {
                 // Stop generating if we run out of horizontal space
@@ -948,17 +1003,30 @@
                 // Create permanent turrets
                 module.turrets.forEach(tData => {
                     const [x, y, angle, minX_offset, maxX_offset, minY_offset, maxY_offset, moveSpeed] = tData;
-                    
+
                     const minX = currentX + minX_offset;
                     const maxX = currentX + maxX_offset;
                     const minY = y + minY_offset; 
                     const maxY = y + maxY_offset;
-                    
+
                     turrets.push(new Turret(x + currentX, y, angle, minX, maxX, minY, maxY, moveSpeed, false, false));
                 });
-                
-                // Mega turrets are now spawned dynamically, not from level modules
-                
+
+                // Create MEGA turrets (NEW)
+                if (module.megaTurrets) {
+                    module.megaTurrets.forEach(tData => {
+                        const [x, y, angle, minX_offset, maxX_offset, minY_offset, maxY_offset, moveSpeed] = tData;
+
+                        const minX = currentX + minX_offset;
+                        const maxX = currentX + maxX_offset;
+                        const minY = y + minY_offset; 
+                        const maxY = y + maxY_offset;
+
+                        // Pass true for the isMegaTurret flag
+                        megaTurrets.push(new Turret(x + currentX, y, angle, minX, maxX, minY, maxY, moveSpeed, false, true));
+                    });
+                }
+
                 // Save potential collectible spawn points
                 module.spawnPoints.forEach(sPoint => {
                     if (sPoint[0] + currentX < GAME_WIDTH - WALL_THICKNESS - 10) {
@@ -984,7 +1052,7 @@
                         furthestSpawnPos = pos;
                     }
                 }
-                
+
                 if (furthestSpawnPos) {
                     collectible = new Collectible(furthestSpawnPos.x, furthestSpawnPos.y);
                 } else {
@@ -1008,30 +1076,31 @@
             temporaryTurrets = [];
             megaTurrets = []; // Clear mega turrets
             projectiles = []; 
-            // Initialize cooldown to 0 so the first batch spawns instantly on the first frame
+            // Initialize cooldowns to 0 so the first batches spawn instantly on the first frame
             temporaryTurretCooldown = 0;
-            megaTurretCooldown = 0;
-            
+            megaTurretSpawnCooldown = 0; // Reset mega turret spawn cooldown
+
             player = new Player(0, 0); 
 
             generateLevel();
             updateTempSettingsDisplay();
             updateMegaSettingsDisplay(); // Call new display function
-            
+
             requestAnimationFrame(gameLoop);
         }
-        
+
         function updateTempSettingsDisplay() {
-            TEMP_PROJ_DISPLAY.innerHTML = 
-                'Timed Laser: Speed: ' + TEMP_PROJ_SPEED + ' | Radius: ' + TEMP_PROJ_RADIUS + ' | Color: ' + TEMP_PROJ_COLOR + '<br>' +
-                '<b>Lifespan: ' + TURRET_LIFESPAN_MS + 'ms</b> | <b>Refill Cooldown: ' + TEMPORARY_TURRET_SPAWN_COOLDOWN_MS + 'ms</b> | <b>Max Active: ' + MAX_ACTIVE_TEMPORARY_TURRETS + '</b>';
+            TEMP_PROJ_DISPLAY.innerHTML = `
+                Timed Laser: Speed: ${TEMP_PROJ_SPEED} | Radius: ${TEMP_PROJ_RADIUS} | Color: ${TEMP_PROJ_COLOR}<br>
+                **Lifespan: ${TURRET_LIFESPAN_MS}ms** | **Refill Cooldown: ${TEMPORARY_TURRET_SPAWN_COOLDOWN_MS}ms** | **Max Active: ${MAX_ACTIVE_TEMPORARY_TURRETS}**
+            `;
         }
 
         // --- NEW FUNCTION: Mega Settings Display ---
         function updateMegaSettingsDisplay() {
             MEGA_PROJ_DISPLAY.innerHTML = 
-                'MEGA Turret: Fire Cooldown: ' + MEGA_TURRET_COOLDOWN + 'ms | Lifespan: ' + MEGA_TURRET_LIFESPAN_MS + 'ms | Max Active: ' + MAX_ACTIVE_MEGA_TURRETS + '<br>' +
-                '<b>Big Proj:</b> Speed: ' + MEGA_PROJECTILE_SPEED + ' | Radius: ' + MEGA_PROJECTILE_RADIUS + ' | <b>Explosion:</b> Count: ' + MINI_PROJECTILE_COUNT + ' | Mini Speed: ' + MINI_PROJECTILE_SPEED + ' | Mini Radius: ' + MINI_PROJECTILE_RADIUS;
+                'MEGA Turret - Fire Rate: ' + MEGA_TURRET_COOLDOWN + 'ms | Big Proj Speed: ' + MEGA_PROJECTILE_SPEED + ' | Big Proj Radius: ' + MEGA_PROJECTILE_RADIUS + '<br>' +
+                '**Explosion:** Count: ' + MINI_PROJECTILE_COUNT + ' | Mini Speed: ' + MINI_PROJECTILE_SPEED + ' | **Lifespan: ' + MEGA_TURRET_LIFESPAN_MS + 'ms** | **Spawn Cooldown: ' + MEGA_TURRET_SPAWN_COOLDOWN_MS + 'ms** | **Max Active: ' + MAX_ACTIVE_MEGA_TURRETS + '**';
         }
         // ------------------------------------------
 
@@ -1049,7 +1118,7 @@
                     const previousBottom = playerBounds.bottom - player.vy; 
                     const previousTop = playerBounds.top - player.vy;     
                     const y_axis_alignment = playerBounds.right > pBounds.left + 1 && playerBounds.left < pBounds.right - 1;
-                    
+
                     let hitWallSide = 0; // 1 for moving into right wall, -1 for moving into left wall
 
                     // 1. VERTICAL COLLISION (Landing or Headbump)
@@ -1093,7 +1162,7 @@
 
             projectiles.forEach(proj => {
                 let collision = false;
-                
+
                 // 1. Check Player Hit
                 if (
                     proj.x + proj.radius > player.x && proj.x - proj.radius < player.x + player.width &&
@@ -1108,13 +1177,13 @@
                     // Simple AABB check - approximate with a circle for simplicity
                     const closestX = Math.max(p.x, Math.min(proj.x, p.x + p.width));
                     const closestY = Math.max(p.y, Math.min(proj.y, p.y + p.height));
-                    
+
                     const dx = proj.x - closestX;
                     const dy = proj.y - closestY;
-                    
+
                     if ((dx * dx + dy * dy) < (proj.radius * proj.radius)) {
                         collision = true;
-                        
+
                         // --- MEGA PROJECTILE EXPLOSION LOGIC ---
                         if (proj.isMega) {
                             // Add the newly created mini projectiles to the main list
@@ -1138,7 +1207,7 @@
             if (collectible.collected) return; 
 
             const pBounds = player.getBounds();
-            
+
             if (
                 pBounds.right > collectible.x && pBounds.left < collectible.x + collectible.size &&
                 pBounds.bottom > collectible.y && pBounds.top < collectible.y + collectible.size
@@ -1164,15 +1233,15 @@
             ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
             ctx.shadowBlur = 0; 
-            
+
             platforms.forEach(p => p.draw());
-            
+
             turrets.forEach(t => t.draw());
             temporaryTurrets.forEach(t => t.draw());
             megaTurrets.forEach(t => t.draw()); // Draw mega turrets
 
             projectiles.forEach(p => p.draw());
-            
+
             collectible.draw();
             player.draw();
         }
@@ -1190,31 +1259,27 @@
                 temporaryTurretCooldown = TEMPORARY_TURRET_SPAWN_COOLDOWN_MS;
             }
 
-            // 2b. Refill Mega Turrets
-            megaTurretCooldown -= deltaTime;
-            if (megaTurretCooldown <= 0) {
-                attemptRefillMegaTurrets();
-                megaTurretCooldown = MEGA_TURRET_SPAWN_COOLDOWN_MS;
+            // 3. Spawn Mega Turrets
+            megaTurretSpawnCooldown -= deltaTime;
+            if (megaTurretSpawnCooldown <= 0) {
+                attemptSpawnMegaTurret();
+                megaTurretSpawnCooldown = MEGA_TURRET_SPAWN_COOLDOWN_MS;
             }
 
-            // 3. Update Turrets (Normal, Temporary, and Mega)
+            // 4. Update Turrets (Normal, Temporary, and Mega)
             turrets.forEach(t => t.update(deltaTime, projectiles));
-            
-            megaTurrets = megaTurrets.filter(t => {
-                t.update(deltaTime, projectiles);
-                return !t.isDead;
-            });
+            megaTurrets.forEach(t => t.update(deltaTime, projectiles));
 
             temporaryTurrets = temporaryTurrets.filter(t => {
                 t.update(deltaTime, projectiles);
                 return !t.isDead;
             });
-            
-            // 4. Update Projectiles
+
+            // 5. Update Projectiles
             projectiles.forEach(p => p.update());
             projectiles = projectiles.filter(p => !p.isDead);
 
-            // 5. Collision Checks
+            // 6. Collision Checks
             checkPlatformCollision();
             checkProjectileCollision(); // Updated to handle explosions
             checkWinCondition();
@@ -1252,4 +1317,4 @@
         initializeGame();
     </script>
 </body>
-</html> 
+</html>
