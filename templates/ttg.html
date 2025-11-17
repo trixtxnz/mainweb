@@ -147,6 +147,7 @@
         // Game State
         let gameRunning = false;
         let keys = {};
+        let sKeyPressed = false; // Track if S key was already pressed
 
         // Game Objects Arrays
         let platforms = [];
@@ -230,9 +231,10 @@
                     this.vy += GRAVITY;
                 }
 
-                // S key to stop vertical momentum
-                if (keys['KeyS'] || keys['ArrowDown']) {
+                // S key to stop vertical momentum (only once per press)
+                if ((keys['KeyS'] || keys['ArrowDown']) && !sKeyPressed) {
                     this.vy = 0;
+                    sKeyPressed = true;
                 }
 
                 this.x += this.vx;
@@ -1203,6 +1205,9 @@
 
         document.addEventListener('keyup', (e) => {
             keys[e.code] = false;
+            if (e.code === 'KeyS' || e.code === 'ArrowDown') {
+                sKeyPressed = false;
+            }
         });
 
         // Initialize the game when the page loads
