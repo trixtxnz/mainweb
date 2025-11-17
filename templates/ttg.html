@@ -133,9 +133,9 @@
         const MINI_PROJECTILE_COLOR = '#ffc300'; // Gold color
         
         // Mega Turret Spawn Settings
-        const MEGA_TURRET_LIFESPAN_MS = 5000; // How long mega turret stays alive
-        const MEGA_TURRET_SPAWN_COOLDOWN_MS = 3000; // Time between spawning new mega turrets
-        const MAX_ACTIVE_MEGA_TURRETS = 3; // Maximum number of mega turrets at once
+        const MEGA_TURRET_LIFESPAN_MS = 2000; // How long mega turret stays alive
+        const MEGA_TURRET_SPAWN_COOLDOWN_MS = 6000; // Time between spawning new mega turrets
+        const MAX_ACTIVE_MEGA_TURRETS = 1; // Maximum number of mega turrets at once
 
         // Safety Zone Constant
         const START_ZONE_CLEARANCE = 150; // Minimum vertical clearance (in pixels) from player's start Y position.
@@ -230,6 +230,11 @@
                     this.vy += GRAVITY;
                 }
 
+                // S key to stop vertical momentum
+                if (keys['KeyS'] || keys['ArrowDown']) {
+                    this.vy = 0;
+                }
+
                 this.x += this.vx;
                 this.y += this.vy;
 
@@ -242,8 +247,9 @@
                 const isPlayerMidAir = this.y + this.height < GAME_HEIGHT - GROUND_HEIGHT;
 
                 // Check Left Boundary
-                if (this.x < 0) {
-                    this.x = 0; 
+                if (this.x <= WALL_THICKNESS) {
+                    this.x = WALL_THICKNESS; 
+                    this.vx = 0;
                     if (isPlayerMidAir) { 
                         this.onWall = true;
                         this.wallSide = -1; 
@@ -251,8 +257,9 @@
                 } 
 
                 // Check Right Boundary
-                else if (this.x + this.width > GAME_WIDTH) {
-                    this.x = GAME_WIDTH - this.width; 
+                else if (this.x + this.width >= GAME_WIDTH - WALL_THICKNESS) {
+                    this.x = GAME_WIDTH - WALL_THICKNESS - this.width; 
+                    this.vx = 0;
                     if (isPlayerMidAir) { 
                         this.onWall = true;
                         this.wallSide = 1; 
