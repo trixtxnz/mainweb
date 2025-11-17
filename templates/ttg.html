@@ -154,8 +154,10 @@
         let lastTime = 0;
 
         // Temporary Turret Management
-        let temporaryTurretCooldown = TEMPORARY_TURRET_SPAWN_COOLDOWN_MS;
-        let megaTurretCooldown = MEGA_TURRET_COOLDOWN; 
+        let temporaryTurretCooldown = TEMPORARY_TURRET_SPAWN_COOLDOWN_MS; 
+        
+        // Mega Turret Management
+        let megaTurretCooldown = MEGA_TURRET_COOLDOWN;
         
         // --- Game Objects (Classes) ---
         
@@ -504,13 +506,12 @@
                         if (!this.isTemporary) {
                             this.timeUntilNextShot = this.fireCooldown; 
                         } else {
-                            // For temporary turrets (including mega), set to high number after first shot
                             this.timeUntilNextShot = 9999999; 
                         }
                     }
                 }
                 
-                // 3. Despawn Logic (for temporary turrets, including mega turrets)
+                // 3. Despawn Logic (for temporary turrets)
                 if (this.isTemporary) {
                     if (this.hasFired) {
                         this.despawnTimer -= deltaTime;
@@ -783,7 +784,7 @@
             }
         }
 
-        // Function to spawn a single mega turret on the walls
+        // Function to spawn a single mega turret on the wall
         function spawnMegaTurret() {
             const turretWidth = 30;
             const turretHeight = 10;
@@ -811,15 +812,15 @@
                 angle = Math.PI;
             }
             
-            // Random Y position
+            // Pick a random Y within the safe range
             const y = Math.random() * verticalRange + minY_Safe;
 
-            // Create and add the mega turret (temporary, with isMegaTurret = true)
+            // Create and add the mega turret (isMegaTurret = true)
             const newMegaTurret = new Turret(
                 x, y, angle, 
                 x, x, y, y, 0, 
-                true, // isTemporary = true
-                true  // isMegaTurret = true
+                false, // Not temporary
+                true   // Is mega turret
             );
 
             megaTurrets.push(newMegaTurret);
@@ -870,6 +871,21 @@
                     
                     turrets.push(new Turret(x + currentX, y, angle, minX, maxX, minY, maxY, moveSpeed, false, false));
                 });
+                
+                // Create MEGA turrets (NEW)
+                if (module.megaTurrets) {
+                    module.megaTurrets.forEach(tData => {
+                        const [x, y, angle, minX_offset, maxX_offset, minY_offset, maxY_offset, moveSpeed] = tData;
+                        
+                        const minX = currentX + minX_offset;
+                        const maxX = currentX + maxX_offset;
+                        const minY = y + minY_offset; 
+                        const maxY = y + maxY_offset;
+                        
+                        // Pass true for the isMegaTurret flag
+                        megaTurrets.push(new Turret(x + currentX, y, angle, minX, maxX, minY, maxY, moveSpeed, false, true));
+                    });
+                }
                 
                 // Save potential collectible spawn points
                 module.spawnPoints.forEach(sPoint => {
@@ -922,6 +938,7 @@
             projectiles = []; 
             // Initialize cooldown to 0 so the first batch spawns instantly on the first frame
             temporaryTurretCooldown = 0;
+            megaTurretCooldown = MEGA_TURRET_COOLDOWN; // Start with full cooldown for mega turrets
             
             player = new Player(0, 0); 
 
@@ -933,16 +950,18 @@
         }
         
         function updateTempSettingsDisplay() {
-            TEMP_PROJ_DISPLAY.innerHTML = 
-                'Timed Laser: Speed: ' + TEMP_PROJ_SPEED + ' | Radius: ' + TEMP_PROJ_RADIUS + ' | Color: ' + TEMP_PROJ_COLOR + '<br>' +
-                '**Lifespan: ' + TURRET_LIFESPAN_MS + 'ms** | **Refill Cooldown: ' + TEMPORARY_TURRET_SPAWN_COOLDOWN_MS + 'ms** | **Max Active: ' + MAX_ACTIVE_TEMPORARY_TURRETS + '**';
+            TEMP_PROJ_DISPLAY.innerHTML = `
+                Timed Laser: Speed: ${TEMP_PROJ_SPEED} | Radius: ${TEMP_PROJ_RADIUS} | Color: ${TEMP_PROJ_COLOR}<br>
+                **Lifespan: ${TURRET_LIFESPAN_MS}ms** | **Refill Cooldown: ${TEMPORARY_TURRET_SPAWN_COOLDOWN_MS}ms** | **Max Active: ${MAX_ACTIVE_TEMPORARY_TURRETS}**
+            `;
         }
 
         // --- NEW FUNCTION: Mega Settings Display ---
         function updateMegaSettingsDisplay() {
-            MEGA_PROJ_DISPLAY.innerHTML = 
-                'MEGA Turret: Cooldown: ' + MEGA_TURRET_COOLDOWN + 'ms | Big Proj Speed: ' + MEGA_PROJECTILE_SPEED + ' | Big Proj Radius: ' + MEGA_PROJECTILE_RADIUS + '<br>' +
-                '**Explosion:** Count: ' + MINI_PROJECTILE_COUNT + ' | Mini Proj Speed: ' + MINI_PROJECTILE_SPEED + ' | Mini Proj Radius: ' + MINI_PROJECTILE_RADIUS + ' | Color: ' + MINI_PROJECTILE_COLOR;
+            MEGA_PROJ_DISPLAY.innerHTML = `
+                MEGA Turret: Cooldown: ${MEGA_TURRET_COOLDOWN}ms | Big Proj Speed: ${MEGA_PROJECTILE_SPEED} | Big Proj Radius: ${MEGA_PROJECTILE_RADIUS}<br>
+                **Explosion:** Count: ${MINI_PROJECTILE_COUNT} | Mini Proj Speed: ${MINI_PROJECTILE_SPEED} | Mini Proj Radius: ${MINI_PROJECTILE_RADIUS} | Color: ${MINI_PROJECTILE_COLOR}
+            `;
         }
         // ------------------------------------------
 
@@ -998,50 +1017,45 @@
             });
         }
 
-        // --- PROJECTILE COLLISION LOGIC ---
+        // --- NEW PROJECTILE COLLISION LOGIC ---
         function checkProjectileCollision() {
             const newProjectiles = [];
 
             projectiles.forEach(proj => {
-                let hitPlayer = false;
-                let hitPlatform = false;
+                let collision = false;
                 
                 // 1. Check Player Hit
                 if (
                     proj.x + proj.radius > player.x && proj.x - proj.radius < player.x + player.width &&
                     proj.y + proj.radius > player.y && proj.y - proj.radius < player.y + player.height
                 ) {
-                    hitPlayer = true;
+                    collision = true;
                     if (gameRunning) gameOver("You were hit by a projectile! Try again.");
                 }
 
                 // 2. Check Platform Hit (Triggers explosion for MegaProjectile)
-                if (!hitPlayer) {
-                    platforms.forEach(p => {
-                        if (hitPlatform) return; // Skip if already hit a platform
+                platforms.forEach(p => {
+                    // Simple AABB check - approximate with a circle for simplicity
+                    const closestX = Math.max(p.x, Math.min(proj.x, p.x + p.width));
+                    const closestY = Math.max(p.y, Math.min(proj.y, p.y + p.height));
+                    
+                    const dx = proj.x - closestX;
+                    const dy = proj.y - closestY;
+                    
+                    if ((dx * dx + dy * dy) < (proj.radius * proj.radius)) {
+                        collision = true;
                         
-                        // Simple AABB check - approximate with a circle for simplicity
-                        const closestX = Math.max(p.x, Math.min(proj.x, p.x + p.width));
-                        const closestY = Math.max(p.y, Math.min(proj.y, p.y + p.height));
-                        
-                        const dx = proj.x - closestX;
-                        const dy = proj.y - closestY;
-                        
-                        if ((dx * dx + dy * dy) < (proj.radius * proj.radius)) {
-                            hitPlatform = true;
-                            
-                            // --- MEGA PROJECTILE EXPLOSION LOGIC ---
-                            if (proj.isMega) {
-                                // Add the newly created mini projectiles to the main list
-                                newProjectiles.push(...proj.explodeIntoMiniProjectiles());
-                            }
-                            // Regular projectiles just die on platform hit
+                        // --- MEGA PROJECTILE EXPLOSION LOGIC ---
+                        if (proj.isMega) {
+                            // Add the newly created mini projectiles to the main list
+                            newProjectiles.push(...proj.explodeIntoMiniProjectiles());
+                            // Do NOT push the mega projectile back (it's dead/exploded)
                         }
-                    });
-                }
+                    }
+                });
 
-                // Add projectile back if it hasn't collided and is not dead
-                if (!hitPlayer && !hitPlatform && !proj.isDead) {
+                // Add projectile back if it hasn't collided and is not dead (MegaProjectile only explodes, doesn't bounce/die otherwise)
+                if (!collision && !proj.isDead) {
                     newProjectiles.push(proj);
                 }
             });
@@ -1106,7 +1120,7 @@
                 temporaryTurretCooldown = TEMPORARY_TURRET_SPAWN_COOLDOWN_MS;
             }
 
-            // 2b. Spawn Mega Turrets on cooldown
+            // 2b. Spawn Mega Turrets on timer
             megaTurretCooldown -= deltaTime;
             if (megaTurretCooldown <= 0) {
                 spawnMegaTurret();
@@ -1115,13 +1129,9 @@
 
             // 3. Update Turrets (Normal, Temporary, and Mega)
             turrets.forEach(t => t.update(deltaTime, projectiles));
-            
-            temporaryTurrets = temporaryTurrets.filter(t => {
-                t.update(deltaTime, projectiles);
-                return !t.isDead;
-            });
+            megaTurrets.forEach(t => t.update(deltaTime, projectiles));
 
-            megaTurrets = megaTurrets.filter(t => {
+            temporaryTurrets = temporaryTurrets.filter(t => {
                 t.update(deltaTime, projectiles);
                 return !t.isDead;
             });
@@ -1168,4 +1178,4 @@
         initializeGame();
     </script>
 </body>
-</html> 
+</html>  
