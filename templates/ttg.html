@@ -933,18 +933,16 @@
         }
         
         function updateTempSettingsDisplay() {
-            TEMP_PROJ_DISPLAY.innerHTML = `
-                Timed Laser: Speed: ${TEMP_PROJ_SPEED} | Radius: ${TEMP_PROJ_RADIUS} | Color: ${TEMP_PROJ_COLOR}<br>
-                **Lifespan: ${TURRET_LIFESPAN_MS}ms** | **Refill Cooldown: ${TEMPORARY_TURRET_SPAWN_COOLDOWN_MS}ms** | **Max Active: ${MAX_ACTIVE_TEMPORARY_TURRETS}**
-            `;
+            TEMP_PROJ_DISPLAY.innerHTML = 
+                'Timed Laser: Speed: ' + TEMP_PROJ_SPEED + ' | Radius: ' + TEMP_PROJ_RADIUS + ' | Color: ' + TEMP_PROJ_COLOR + '<br>' +
+                '**Lifespan: ' + TURRET_LIFESPAN_MS + 'ms** | **Refill Cooldown: ' + TEMPORARY_TURRET_SPAWN_COOLDOWN_MS + 'ms** | **Max Active: ' + MAX_ACTIVE_TEMPORARY_TURRETS + '**';
         }
 
         // --- NEW FUNCTION: Mega Settings Display ---
         function updateMegaSettingsDisplay() {
-            MEGA_PROJ_DISPLAY.innerHTML = `
-                MEGA Turret: Cooldown: ${MEGA_TURRET_COOLDOWN}ms | Big Proj Speed: ${MEGA_PROJECTILE_SPEED} | Big Proj Radius: ${MEGA_PROJECTILE_RADIUS}<br>
-                **Explosion:** Count: ${MINI_PROJECTILE_COUNT} | Mini Proj Speed: ${MINI_PROJECTILE_SPEED} | Mini Proj Radius: ${MINI_PROJECTILE_RADIUS} | Color: ${MINI_PROJECTILE_COLOR}
-            `;
+            MEGA_PROJ_DISPLAY.innerHTML = 
+                'MEGA Turret: Cooldown: ' + MEGA_TURRET_COOLDOWN + 'ms | Big Proj Speed: ' + MEGA_PROJECTILE_SPEED + ' | Big Proj Radius: ' + MEGA_PROJECTILE_RADIUS + '<br>' +
+                '**Explosion:** Count: ' + MINI_PROJECTILE_COUNT + ' | Mini Proj Speed: ' + MINI_PROJECTILE_SPEED + ' | Mini Proj Radius: ' + MINI_PROJECTILE_RADIUS + ' | Color: ' + MINI_PROJECTILE_COLOR;
         }
         // ------------------------------------------
 
