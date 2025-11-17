@@ -1000,45 +1000,50 @@
             });
         }
 
-        // --- NEW PROJECTILE COLLISION LOGIC ---
+        // --- PROJECTILE COLLISION LOGIC ---
         function checkProjectileCollision() {
             const newProjectiles = [];
 
             projectiles.forEach(proj => {
-                let collision = false;
+                let hitPlayer = false;
+                let hitPlatform = false;
                 
                 // 1. Check Player Hit
                 if (
                     proj.x + proj.radius > player.x && proj.x - proj.radius < player.x + player.width &&
                     proj.y + proj.radius > player.y && proj.y - proj.radius < player.y + player.height
                 ) {
-                    collision = true;
+                    hitPlayer = true;
                     if (gameRunning) gameOver("You were hit by a projectile! Try again.");
                 }
 
                 // 2. Check Platform Hit (Triggers explosion for MegaProjectile)
-                platforms.forEach(p => {
-                    // Simple AABB check - approximate with a circle for simplicity
-                    const closestX = Math.max(p.x, Math.min(proj.x, p.x + p.width));
-                    const closestY = Math.max(p.y, Math.min(proj.y, p.y + p.height));
-                    
-                    const dx = proj.x - closestX;
-                    const dy = proj.y - closestY;
-                    
-                    if ((dx * dx + dy * dy) < (proj.radius * proj.radius)) {
-                        collision = true;
+                if (!hitPlayer) {
+                    platforms.forEach(p => {
+                        if (hitPlatform) return; // Skip if already hit a platform
                         
-                        // --- MEGA PROJECTILE EXPLOSION LOGIC ---
-                        if (proj.isMega) {
-                            // Add the newly created mini projectiles to the main list
-                            newProjectiles.push(...proj.explodeIntoMiniProjectiles());
-                            // Do NOT push the mega projectile back (it's dead/exploded)
+                        // Simple AABB check - approximate with a circle for simplicity
+                        const closestX = Math.max(p.x, Math.min(proj.x, p.x + p.width));
+                        const closestY = Math.max(p.y, Math.min(proj.y, p.y + p.height));
+                        
+                        const dx = proj.x - closestX;
+                        const dy = proj.y - closestY;
+                        
+                        if ((dx * dx + dy * dy) < (proj.radius * proj.radius)) {
+                            hitPlatform = true;
+                            
+                            // --- MEGA PROJECTILE EXPLOSION LOGIC ---
+                            if (proj.isMega) {
+                                // Add the newly created mini projectiles to the main list
+                                newProjectiles.push(...proj.explodeIntoMiniProjectiles());
+                            }
+                            // Regular projectiles just die on platform hit
                         }
-                    }
-                });
+                    });
+                }
 
-                // Add projectile back if it hasn't collided and is not dead (MegaProjectile only explodes, doesn't bounce/die otherwise)
-                if (!collision && !proj.isDead) {
+                // Add projectile back if it hasn't collided and is not dead
+                if (!hitPlayer && !hitPlatform && !proj.isDead) {
                     newProjectiles.push(proj);
                 }
             });
