@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Retro Platformer - Randomized</title>
     <style>
-        /* platform arrys line 553 */
+        /* platform arrys line 566 */
         /* Custom retro/pixel font */
+        
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-        /* platform arrys line 553 */
         body {
             display: flex;
             flex-direction: column;
@@ -66,7 +66,7 @@
     </div>
 
     <div class="controls">
-        Move: <b>&larr;</b> & <b>&rarr;</b> | Jump: <b>&uarr;</b>/W/Space | Stop Fall: <b>S</b> | Wall Jump Enabled! | Reset: <b>R</b>
+        Move: <b>&larr;</b> & <b>&rarr;</b> | Jump: <b>&uarr;</b>/W/Space | Stop Fall: <b>S</b> | Wall Jump Enabled! | Reset: <b>R</b> <br>High Jump: Press <b>S</b> then <b>W</b>
     </div>
 
     <script>
@@ -76,8 +76,8 @@
         const STATUS_MESSAGE = document.getElementById('status-message');
 
         // NEW DIMENSIONS: Larger game area
-        const GAME_WIDTH = 900; 
-        const GAME_HEIGHT = 550; 
+        const GAME_WIDTH = 890; 
+        const GAME_HEIGHT = 540; 
         const GROUND_HEIGHT = 10; 
         const WALL_THICKNESS = 10; 
 
@@ -108,7 +108,7 @@
         const MEGA_PROJECTILE_RADIUS = 12; // Bigger ball radius
         const MEGA_PROJECTILE_COLOR = '#ff0000'; // Red color
         const MEGA_PROJECTILE_SPEED = 5;
-        const MEGA_TURRET_FIRE_COOLDOWN = 4000; // Slow firing rate
+        const MEGA_TURRET_FIRE_COOLDOWN = 3000; // Slow firing rate
         
         const MINI_PROJECTILE_COUNT = 8; // Number of smaller projectiles
         const MINI_PROJECTILE_RADIUS = 3; // Tiny projectile size
@@ -116,8 +116,8 @@
         const MINI_PROJECTILE_COLOR = '#ffc300'; // Gold color
         
         // Mega Turret Spawn Settings
-        const MEGA_TURRET_LIFESPAN_MS = 2000; // How long mega turret stays alive
-        const MEGA_TURRET_SPAWN_COOLDOWN_MS = 6000; // Time between spawning new mega turrets
+        const MEGA_TURRET_LIFESPAN_MS = 1000; // How long mega turret stays alive
+        const MEGA_TURRET_SPAWN_COOLDOWN_MS = 4000; // Time between spawning new mega turrets
         const MAX_ACTIVE_MEGA_TURRETS = 1; // Maximum number of mega turrets at once
 
         // Safety Zone Constant
@@ -133,7 +133,7 @@
         let sKeyPressed = false; // Track if S key was already pressed
         let sKeyPressTime = 0; // Track when S was pressed
         const HIGH_JUMP_WINDOW = 300; // Time window in ms to press W after S for high jump
-        const HIGH_JUMP_VELOCITY = -15; // Stronger jump velocity
+        const HIGH_JUMP_VELOCITY = -13; // Stronger jump velocity
 
         // Game Objects Arrays
         let platforms = [];
@@ -569,31 +569,29 @@
             {
                 moduleWidth: 150, 
                 platforms: [
-                    [10, GAME_HEIGHT - 60, 50, 15],
-                    [80, GAME_HEIGHT - 120, 50, 15],
-                    [20, GAME_HEIGHT - 200, 50, 15] // Added higher platform
+                    [10, GAME_HEIGHT - 60, 50, 10],
+                    [10, GAME_HEIGHT - 200, 50, 10] // Added higher platform
                 ],
                 turrets: [],
                 megaTurrets: [], // Added for consistency
                 spawnPoints: [
-                    [25, GAME_HEIGHT - 60 - 25], 
-                    [95, GAME_HEIGHT - 120 - 25],
-                    [35, GAME_HEIGHT - 200 - 25] // New spawn point
+                    [30, GAME_HEIGHT - 70 - 25], 
+                    [30, GAME_HEIGHT - 210 - 25]
                 ]
             },
             // Module 2: Long platform with static downward turret (HAS TURRET)
             {
                 moduleWidth: 200,
                 platforms: [
-                    [20, GAME_HEIGHT - 100, 160, 15]
+                    [20, GAME_HEIGHT - 120, 160, 15]
                 ],
                 turrets: [
                     [100, GAME_HEIGHT - 170 - 10 - 30, Math.PI / 2]
                 ],
                 megaTurrets: [],
                 spawnPoints: [
-                    [50, GAME_HEIGHT - 100 - 25], 
-                    [150, GAME_HEIGHT - 100 - 25] 
+                    [40, GAME_HEIGHT - 135 - 25], 
+                    [160, GAME_HEIGHT - 135 - 25] 
                 ]
             },
             // Module 3: High platform with moving horizontal turret (HAS TURRET)
@@ -607,8 +605,9 @@
                 ],
                 megaTurrets: [],
                 spawnPoints: [
-                    [80, GAME_HEIGHT - 180 - 25], 
-                    [180, GAME_HEIGHT - 180 - 25]
+                    [70, GAME_HEIGHT - 195 - 25], 
+                    [140, GAME_HEIGHT - 195 - 25],
+                    [210, GAME_HEIGHT - 195 - 25]
                 ]
             },
             // Module 4: Tall vertical wall for wall jump practice (NO TURRET)
@@ -620,8 +619,8 @@
                 turrets: [],
                 megaTurrets: [],
                 spawnPoints: [
-                    [50, GAME_HEIGHT - 100 - 25], 
-                    [40, GAME_HEIGHT - 200]
+                    [40, GAME_HEIGHT - 115 - 25], 
+                    [40, GAME_HEIGHT - 160 - 25]
                 ]
             },
             // Module 5: Steep vertical platforms for upward movement 
@@ -635,9 +634,9 @@
                 turrets: [],
                 megaTurrets: [],
                 spawnPoints: [
-                    [30, GAME_HEIGHT - 150 - 25],
-                    [100, GAME_HEIGHT - 250 - 25],
-                    [30, GAME_HEIGHT - 350 - 25]
+                    [35, GAME_HEIGHT - 165 - 25],
+                    [105, GAME_HEIGHT - 265 - 25],
+                    [35, GAME_HEIGHT - 365 - 25]
                 ]
             },
             // Module 6: High ceiling ledge with right diagonal turret
@@ -653,8 +652,9 @@
                 ],
                 megaTurrets: [],
                 spawnPoints: [
-                    [30, GAME_HEIGHT - 100 - 25],
-                    [120, GAME_HEIGHT - 380 - 25]
+                    [35, GAME_HEIGHT - 115 - 25],
+                    [90, GAME_HEIGHT - 395 - 25],
+                    [160, GAME_HEIGHT - 395 - 25]
                 ]
             },
             // Module 7: High ceiling ledge with left diagonal turret
@@ -670,8 +670,9 @@
                 ],
                 megaTurrets: [],
                 spawnPoints: [
-                    [30, GAME_HEIGHT - 100 - 25],
-                    [120, GAME_HEIGHT - 380 - 25]
+                    [35, GAME_HEIGHT - 115 - 25],
+                    [90, GAME_HEIGHT - 395 - 25],
+                    [160, GAME_HEIGHT - 395 - 25]
                 ]
             },
             // Module 8: middle horizontal platform 
@@ -683,9 +684,19 @@
                 turrets: [],
                 megaTurrets: [],
                 spawnPoints: [
-                    [30, GAME_HEIGHT - 150 - 25],
-                    [100, GAME_HEIGHT - 250 - 25],
-                    [30, GAME_HEIGHT - 350 - 25]
+                    [105, GAME_HEIGHT - 265 - 25]
+                ]
+            },
+             // Module 9: midair Tall vertical wall for wall jump practice (NO TURRET)
+            {
+                moduleWidth: 50,
+                platforms: [
+                    [30, GAME_HEIGHT - 267, 11, 50], 
+                ],
+                turrets: [],
+                megaTurrets: [],
+                spawnPoints: [
+                    [35, GAME_HEIGHT - 242 - 25]
                 ]
             },
         ];
@@ -851,7 +862,7 @@
         function generateLevel() {
             let currentX = 0; 
             // Increased number of modules to fill the new, wider area and account for new vertical modules
-            const numModules = 20; 
+            const numModules = 15; 
             const allSpawnPoints = []; 
 
             // 1. Initial Platforms (Ground and Walls)
