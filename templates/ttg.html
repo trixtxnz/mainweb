@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Retro Platformer - Randomized</title>
     <style>
+        /* platform arrys line 553 */
         /* Custom retro/pixel font */
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-
+        /* platform arrys line 553 */
         body {
             display: flex;
             flex-direction: column;
@@ -130,6 +131,9 @@
         let gameRunning = false;
         let keys = {};
         let sKeyPressed = false; // Track if S key was already pressed
+        let sKeyPressTime = 0; // Track when S was pressed
+        const HIGH_JUMP_WINDOW = 300; // Time window in ms to press W after S for high jump
+        const HIGH_JUMP_VELOCITY = -15; // Stronger jump velocity
 
         // Game Objects Arrays
         let platforms = [];
@@ -217,6 +221,7 @@
                 if ((keys['KeyS'] || keys['ArrowDown']) && !sKeyPressed) {
                     this.vy = 0;
                     sKeyPressed = true;
+                    sKeyPressTime = Date.now(); // Record when S was pressed
                 }
 
                 this.x += this.vx;
@@ -256,7 +261,16 @@
 
                 // Ground Jump (using coyote time)
                 if (this.onGround || this.coyoteTimeCounter > 0) {
-                    this.vy = JUMP_VELOCITY;
+                    // Check if S was pressed recently for high jump
+                    const timeSinceSPress = Date.now() - sKeyPressTime;
+                    if (timeSinceSPress < HIGH_JUMP_WINDOW && sKeyPressTime > 0) {
+                        // High jump!
+                        this.vy = HIGH_JUMP_VELOCITY;
+                        sKeyPressTime = 0; // Reset to prevent multiple high jumps
+                    } else {
+                        // Normal jump
+                        this.vy = JUMP_VELOCITY;
+                    }
                     this.onGround = false;
                     this.coyoteTimeCounter = 0;
                     this.jumpBufferCounter = 0;
@@ -837,7 +851,7 @@
         function generateLevel() {
             let currentX = 0; 
             // Increased number of modules to fill the new, wider area and account for new vertical modules
-            const numModules = 15; 
+            const numModules = 20; 
             const allSpawnPoints = []; 
 
             // 1. Initial Platforms (Ground and Walls)
@@ -1172,6 +1186,7 @@
             keys[e.code] = false;
             if (e.code === 'KeyS' || e.code === 'ArrowDown') {
                 sKeyPressed = false;
+                // Don't reset sKeyPressTime here - we want to keep the timer running
             }
         });
 
