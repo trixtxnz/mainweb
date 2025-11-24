@@ -1173,6 +1173,8 @@
             // Prevent large deltaTime spikes on first frame after reset
             if (lastTime === 0) {
                 lastTime = currentTime;
+                requestAnimationFrame(gameLoop);
+                return; // Skip this frame to properly initialize timing
             }
             
             const deltaTime = currentTime - lastTime;
