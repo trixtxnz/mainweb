@@ -975,6 +975,7 @@
 
             generateLevel();
             
+            lastTime = performance.now(); // Reset lastTime to prevent speed up
             requestAnimationFrame(gameLoop);
         }
         
