@@ -53,6 +53,44 @@
         .controls b {
             color: #ff9800;
         }
+
+        .game-layout {
+            display: flex;
+            align-items: flex-start;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        .difficulty-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 35px;
+        }
+
+        .difficulty-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: 3px solid #ffc300;
+            padding: 12px 20px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.7rem;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s;
+            min-width: 120px;
+        }
+
+        .difficulty-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(255, 195, 0, 0.8);
+        }
+
+        .difficulty-btn.active {
+            background: linear-gradient(135deg, #ffc300 0%, #ff9800 100%);
+            border-color: #fff;
+            box-shadow: 0 0 20px rgba(255, 195, 0, 1);
+        }
     </style>
 </head>
 <body>
@@ -61,8 +99,16 @@
         <div id="status-message" style="color: #48e42f;">Use controls to reach the gem!</div>
     </div>
 
-    <div id="game-container">
-        <canvas id="gameCanvas"></canvas>
+    <div class="game-layout">
+        <div class="difficulty-panel">
+            <button class="difficulty-btn" onclick="setDifficulty('easy')" id="btn-easy">EASY</button>
+            <button class="difficulty-btn active" onclick="setDifficulty('medium')" id="btn-medium">MEDIUM</button>
+            <button class="difficulty-btn" onclick="setDifficulty('hard')" id="btn-hard">HARD</button>
+        </div>
+
+        <div id="game-container">
+            <canvas id="gameCanvas"></canvas>
+        </div>
     </div>
 
     <div class="controls">
@@ -90,35 +136,77 @@
         const JUMP_VELOCITY = -10;
         const WALL_JUMP_X_VELOCITY = 8; 
         
+        // --- DIFFICULTY SETTINGS ---
+        const DIFFICULTY_SETTINGS = {
+            easy: {
+                PROJECTILE_SPEED: 6,
+                TEMP_PROJ_SPEED: 3,
+                MEGA_PROJECTILE_SPEED: 4,
+                MINI_PROJECTILE_SPEED: 4,
+                TEMPORARY_TURRET_SPAWN_COOLDOWN_MS: 100,
+                MAX_ACTIVE_TEMPORARY_TURRETS: 5,
+                MEGA_TURRET_SPAWN_COOLDOWN_MS: 6000,
+                MAX_ACTIVE_MEGA_TURRETS: 1,
+                TURRET_FIRE_COOLDOWN: 2500,
+                MEGA_TURRET_FIRE_COOLDOWN: 4000
+            },
+            medium: {
+                PROJECTILE_SPEED: 8,
+                TEMP_PROJ_SPEED: 4,
+                MEGA_PROJECTILE_SPEED: 5,
+                MINI_PROJECTILE_SPEED: 5,
+                TEMPORARY_TURRET_SPAWN_COOLDOWN_MS: 50,
+                MAX_ACTIVE_TEMPORARY_TURRETS: 7,
+                MEGA_TURRET_SPAWN_COOLDOWN_MS: 4000,
+                MAX_ACTIVE_MEGA_TURRETS: 1,
+                TURRET_FIRE_COOLDOWN: 2000,
+                MEGA_TURRET_FIRE_COOLDOWN: 3000
+            },
+            hard: {
+                PROJECTILE_SPEED: 12,
+                TEMP_PROJ_SPEED: 7,
+                MEGA_PROJECTILE_SPEED: 8,
+                MINI_PROJECTILE_SPEED: 8,
+                TEMPORARY_TURRET_SPAWN_COOLDOWN_MS: 30,
+                MAX_ACTIVE_TEMPORARY_TURRETS: 10,
+                MEGA_TURRET_SPAWN_COOLDOWN_MS: 2500,
+                MAX_ACTIVE_MEGA_TURRETS: 2,
+                TURRET_FIRE_COOLDOWN: 1500,
+                MEGA_TURRET_FIRE_COOLDOWN: 2000
+            }
+        };
+
+        // Current difficulty (default to medium)
+        let currentDifficulty = 'medium';
+        
+        // Current settings (start with medium)
+        let PROJECTILE_SPEED = DIFFICULTY_SETTINGS.medium.PROJECTILE_SPEED;
+        let TEMP_PROJ_SPEED = DIFFICULTY_SETTINGS.medium.TEMP_PROJ_SPEED;
+        let MEGA_PROJECTILE_SPEED = DIFFICULTY_SETTINGS.medium.MEGA_PROJECTILE_SPEED;
+        let MINI_PROJECTILE_SPEED = DIFFICULTY_SETTINGS.medium.MINI_PROJECTILE_SPEED;
+        let TEMPORARY_TURRET_SPAWN_COOLDOWN_MS = DIFFICULTY_SETTINGS.medium.TEMPORARY_TURRET_SPAWN_COOLDOWN_MS;
+        let MAX_ACTIVE_TEMPORARY_TURRETS = DIFFICULTY_SETTINGS.medium.MAX_ACTIVE_TEMPORARY_TURRETS;
+        let MEGA_TURRET_SPAWN_COOLDOWN_MS = DIFFICULTY_SETTINGS.medium.MEGA_TURRET_SPAWN_COOLDOWN_MS;
+        let MAX_ACTIVE_MEGA_TURRETS = DIFFICULTY_SETTINGS.medium.MAX_ACTIVE_MEGA_TURRETS;
+        let TURRET_FIRE_COOLDOWN = DIFFICULTY_SETTINGS.medium.TURRET_FIRE_COOLDOWN;
+        let MEGA_TURRET_FIRE_COOLDOWN = DIFFICULTY_SETTINGS.medium.MEGA_TURRET_FIRE_COOLDOWN;
+        
         // --- PERMANENT TURRET PROJECTILE SETTINGS ---
-        const PROJECTILE_SPEED = 8; 
         const PROJECTILE_COLOR = '#ff4500'; 
         const PROJECTILE_RADIUS = 5;
         
-        // --- TEMPORARY TURRET SETTINGS (CUSTOMIZABLE) ---
-        const TEMP_PROJ_SPEED = 4;    
+        // --- TEMPORARY TURRET SETTINGS ---
         const TEMP_PROJ_COLOR = '#ff8c00'; 
         const TEMP_PROJ_RADIUS = 5;    
-
         const TURRET_LIFESPAN_MS = 2000;
-        const TEMPORARY_TURRET_SPAWN_COOLDOWN_MS = 50; 
-        const MAX_ACTIVE_TEMPORARY_TURRETS = 7; 
         
-        // --- MEGA TURRET/PROJECTILE SETTINGS (NEW) ---
-        const MEGA_PROJECTILE_RADIUS = 12; // Bigger ball radius
-        const MEGA_PROJECTILE_COLOR = '#ff0000'; // Red color
-        const MEGA_PROJECTILE_SPEED = 5;
-        const MEGA_TURRET_FIRE_COOLDOWN = 3000; // Slow firing rate
-        
-        const MINI_PROJECTILE_COUNT = 8; // Number of smaller projectiles
-        const MINI_PROJECTILE_RADIUS = 3; // Tiny projectile size
-        const MINI_PROJECTILE_SPEED = 5; // Fast spread speed
-        const MINI_PROJECTILE_COLOR = '#ffc300'; // Gold color
-    
-        // Mega Turret Spawn Settings
-        const MEGA_TURRET_LIFESPAN_MS = 1000; // How long mega turret stays alive
-        const MEGA_TURRET_SPAWN_COOLDOWN_MS = 4000; // Time between spawning new mega turrets
-        const MAX_ACTIVE_MEGA_TURRETS = 1; // Maximum number of mega turrets at once
+        // --- MEGA TURRET/PROJECTILE SETTINGS ---
+        const MEGA_PROJECTILE_RADIUS = 12;
+        const MEGA_PROJECTILE_COLOR = '#ff0000';
+        const MINI_PROJECTILE_COUNT = 8;
+        const MINI_PROJECTILE_RADIUS = 3;
+        const MINI_PROJECTILE_COLOR = '#ffc300';
+        const MEGA_TURRET_LIFESPAN_MS = 1000;
 
         // Safety Zone Constant
         const START_ZONE_CLEARANCE = 150; // Minimum vertical clearance (in pixels) from player's start Y position.
@@ -407,10 +495,10 @@
                     this.fireCooldown = MEGA_TURRET_FIRE_COOLDOWN;
                 } else if (this.isTemporary) {
                     this.color = '#ff00ff'; // Magenta for temporary
-                    this.fireCooldown = 2000;
+                    this.fireCooldown = TURRET_FIRE_COOLDOWN;
                 } else {
                     this.color = '#7f0000'; // Dark Red for permanent
-                    this.fireCooldown = 2000;
+                    this.fireCooldown = TURRET_FIRE_COOLDOWN;
                 }
                 
                 this.isDead = false;
@@ -859,6 +947,39 @@
         }
 
         // Level Generation Function
+        // --- DIFFICULTY FUNCTION ---
+        function setDifficulty(difficulty) {
+            // Cancel any existing animation frame to prevent multiple loops
+            if (animationFrameId !== null) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            
+            currentDifficulty = difficulty;
+            const settings = DIFFICULTY_SETTINGS[difficulty];
+            
+            // Update all difficulty-dependent variables
+            PROJECTILE_SPEED = settings.PROJECTILE_SPEED;
+            TEMP_PROJ_SPEED = settings.TEMP_PROJ_SPEED;
+            MEGA_PROJECTILE_SPEED = settings.MEGA_PROJECTILE_SPEED;
+            MINI_PROJECTILE_SPEED = settings.MINI_PROJECTILE_SPEED;
+            TEMPORARY_TURRET_SPAWN_COOLDOWN_MS = settings.TEMPORARY_TURRET_SPAWN_COOLDOWN_MS;
+            MAX_ACTIVE_TEMPORARY_TURRETS = settings.MAX_ACTIVE_TEMPORARY_TURRETS;
+            MEGA_TURRET_SPAWN_COOLDOWN_MS = settings.MEGA_TURRET_SPAWN_COOLDOWN_MS;
+            MAX_ACTIVE_MEGA_TURRETS = settings.MAX_ACTIVE_MEGA_TURRETS;
+            TURRET_FIRE_COOLDOWN = settings.TURRET_FIRE_COOLDOWN;
+            MEGA_TURRET_FIRE_COOLDOWN = settings.MEGA_TURRET_FIRE_COOLDOWN;
+            
+            // Update button states
+            document.querySelectorAll('.difficulty-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`btn-${difficulty}`).classList.add('active');
+            
+            // Restart the game with new difficulty
+            if (gameRunning) {
+                initializeGame();
+            }
+        }
+
         function generateLevel() {
             let currentX = 0; 
             // Increased number of modules to fill the new, wider area and account for new vertical modules
