@@ -8,10 +8,6 @@ packages = ["libGL", "libGLU"]
 localPort = 5000
 externalPort = 80
 
-[[ports]]
-localPort = 42899
-externalPort = 3000
-
 [agent]
 expertMode = true
 
