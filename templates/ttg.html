@@ -1053,22 +1053,26 @@
                 currentX += module.moduleWidth + Math.random() * 30 + 20; 
             }
 
-            // 3. Guaranteed Collectible Placement on the furthest highest platform
+            // 3. Guaranteed Collectible Placement on the highest platform (farthest if tied)
             let bestSpawnPos = null;
-            let maxScore = -1;
 
             if (allSpawnPoints.length > 0) {
-                // Find the spawn point that is both furthest (highest X) and highest (lowest Y)
-                // We'll weight distance more heavily than height
+                // First, find the minimum Y value (highest platform)
+                let minY = Infinity;
                 for (const pos of allSpawnPoints) {
-                    // Calculate a score: distance is weighted 2x more than height
-                    // Lower Y values (higher platforms) are better, so we subtract Y from max height
-                    const distanceScore = pos.x * 2;
-                    const heightScore = (GAME_HEIGHT - pos.y);
-                    const totalScore = distanceScore + heightScore;
-                    
-                    if (totalScore > maxScore) {
-                        maxScore = totalScore;
+                    if (pos.y < minY) {
+                        minY = pos.y;
+                    }
+                }
+                
+                // Find all platforms at the highest level
+                const highestPlatforms = allSpawnPoints.filter(pos => pos.y === minY);
+                
+                // Among the highest platforms, find the farthest one (max X)
+                let maxX = -1;
+                for (const pos of highestPlatforms) {
+                    if (pos.x > maxX) {
+                        maxX = pos.x;
                         bestSpawnPos = pos;
                     }
                 }
