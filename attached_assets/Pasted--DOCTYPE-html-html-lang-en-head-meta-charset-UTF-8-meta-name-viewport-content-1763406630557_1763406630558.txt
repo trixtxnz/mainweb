@@ -5,10 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Retro Platformer - Randomized</title>
     <style>
-        /* platform arrys line 566 */
         /* Custom retro/pixel font */
-        
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
         body {
             display: flex;
             flex-direction: column;
@@ -41,6 +40,20 @@
             margin-bottom: 10px;
             font-size: 0.8rem;
         }
+        
+        .temp-settings {
+            margin-top: 5px;
+            font-size: 0.65rem;
+            color: #ff8c00; 
+            line-height: 1.2;
+        }
+
+        .mega-settings {
+            margin-top: 5px;
+            font-size: 0.65rem;
+            color: #ff0000;
+            line-height: 1.2;
+        }
 
         .controls {
             margin-top: 20px;
@@ -59,6 +72,8 @@
 
     <div class="game-info">
         <div id="status-message" style="color: #48e42f;">Use controls to reach the gem!</div>
+        <div id="temp-proj-settings" class="temp-settings"></div>
+        <div id="mega-proj-settings" class="mega-settings"></div>
     </div>
 
     <div id="game-container">
@@ -66,7 +81,7 @@
     </div>
 
     <div class="controls">
-        Move: <b>&larr;</b> & <b>&rarr;</b> | Jump: <b>&uarr;</b>/W/Space | Stop Fall: <b>S</b> | Wall Jump Enabled! | Reset: <b>R</b> <br>High Jump: Press <b>S</b> then <b>W</b>
+        Move: <b>&larr;</b> & <b>&rarr;</b> | Jump: <b>&uarr;</b>/W/Space | Stop Fall: <b>S</b> | Wall Jump Enabled! | Reset: <b>R</b>
     </div>
 
     <script>
@@ -74,10 +89,12 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const STATUS_MESSAGE = document.getElementById('status-message');
+        const TEMP_PROJ_DISPLAY = document.getElementById('temp-proj-settings');
+        const MEGA_PROJ_DISPLAY = document.getElementById('mega-proj-settings'); // New display element
 
         // NEW DIMENSIONS: Larger game area
-        const GAME_WIDTH = 890; 
-        const GAME_HEIGHT = 540; 
+        const GAME_WIDTH = 900; 
+        const GAME_HEIGHT = 550; 
         const GROUND_HEIGHT = 10; 
         const WALL_THICKNESS = 10; 
 
@@ -102,23 +119,18 @@
 
         const TURRET_LIFESPAN_MS = 2000;
         const TEMPORARY_TURRET_SPAWN_COOLDOWN_MS = 50; 
-        const MAX_ACTIVE_TEMPORARY_TURRETS = 7; 
+        const MAX_ACTIVE_TEMPORARY_TURRETS = 6; 
         
         // --- MEGA TURRET/PROJECTILE SETTINGS (NEW) ---
         const MEGA_PROJECTILE_RADIUS = 12; // Bigger ball radius
         const MEGA_PROJECTILE_COLOR = '#ff0000'; // Red color
         const MEGA_PROJECTILE_SPEED = 5;
-        const MEGA_TURRET_FIRE_COOLDOWN = 3000; // Slow firing rate
+        const MEGA_TURRET_COOLDOWN = 4000; // Slow firing rate
         
         const MINI_PROJECTILE_COUNT = 8; // Number of smaller projectiles
         const MINI_PROJECTILE_RADIUS = 3; // Tiny projectile size
         const MINI_PROJECTILE_SPEED = 5; // Fast spread speed
         const MINI_PROJECTILE_COLOR = '#ffc300'; // Gold color
-    
-        // Mega Turret Spawn Settings
-        const MEGA_TURRET_LIFESPAN_MS = 1000; // How long mega turret stays alive
-        const MEGA_TURRET_SPAWN_COOLDOWN_MS = 4000; // Time between spawning new mega turrets
-        const MAX_ACTIVE_MEGA_TURRETS = 1; // Maximum number of mega turrets at once
 
         // Safety Zone Constant
         const START_ZONE_CLEARANCE = 150; // Minimum vertical clearance (in pixels) from player's start Y position.
@@ -130,10 +142,6 @@
         // Game State
         let gameRunning = false;
         let keys = {};
-        let sKeyPressed = false; // Track if S key was already pressed
-        let sKeyPressTime = 0; // Track when S was pressed
-        const HIGH_JUMP_WINDOW = 300; // Time window in ms to press W after S for high jump
-        const HIGH_JUMP_VELOCITY = -13; // Stronger jump velocity
 
         // Game Objects Arrays
         let platforms = [];
@@ -147,9 +155,6 @@
 
         // Temporary Turret Management
         let temporaryTurretCooldown = TEMPORARY_TURRET_SPAWN_COOLDOWN_MS; 
-        
-        // Mega Turret Management
-        let megaTurretCooldown = MEGA_TURRET_SPAWN_COOLDOWN_MS;
         
         // --- Game Objects (Classes) ---
         
@@ -217,13 +222,6 @@
                     this.vy += GRAVITY;
                 }
 
-                // S key to stop vertical momentum (only once per press)
-                if ((keys['KeyS'] || keys['ArrowDown']) && !sKeyPressed) {
-                    this.vy = 0;
-                    sKeyPressed = true;
-                    sKeyPressTime = Date.now(); // Record when S was pressed
-                }
-
                 this.x += this.vx;
                 this.y += this.vy;
 
@@ -236,9 +234,8 @@
                 const isPlayerMidAir = this.y + this.height < GAME_HEIGHT - GROUND_HEIGHT;
 
                 // Check Left Boundary
-                if (this.x <= WALL_THICKNESS) {
-                    this.x = WALL_THICKNESS; 
-                    this.vx = 0;
+                if (this.x < 0) {
+                    this.x = 0; 
                     if (isPlayerMidAir) { 
                         this.onWall = true;
                         this.wallSide = -1; 
@@ -246,9 +243,8 @@
                 } 
 
                 // Check Right Boundary
-                else if (this.x + this.width >= GAME_WIDTH - WALL_THICKNESS) {
-                    this.x = GAME_WIDTH - WALL_THICKNESS - this.width; 
-                    this.vx = 0;
+                else if (this.x + this.width > GAME_WIDTH) {
+                    this.x = GAME_WIDTH - this.width; 
                     if (isPlayerMidAir) { 
                         this.onWall = true;
                         this.wallSide = 1; 
@@ -261,16 +257,7 @@
 
                 // Ground Jump (using coyote time)
                 if (this.onGround || this.coyoteTimeCounter > 0) {
-                    // Check if S was pressed recently for high jump
-                    const timeSinceSPress = Date.now() - sKeyPressTime;
-                    if (timeSinceSPress < HIGH_JUMP_WINDOW && sKeyPressTime > 0) {
-                        // High jump!
-                        this.vy = HIGH_JUMP_VELOCITY;
-                        sKeyPressTime = 0; // Reset to prevent multiple high jumps
-                    } else {
-                        // Normal jump
-                        this.vy = JUMP_VELOCITY;
-                    }
+                    this.vy = JUMP_VELOCITY;
                     this.onGround = false;
                     this.coyoteTimeCounter = 0;
                     this.jumpBufferCounter = 0;
@@ -403,7 +390,7 @@
 
                 if (this.isMegaTurret) {
                     this.color = '#330000'; // Darker red/black for mega turret base
-                    this.fireCooldown = MEGA_TURRET_FIRE_COOLDOWN;
+                    this.fireCooldown = MEGA_TURRET_COOLDOWN;
                 } else if (this.isTemporary) {
                     this.color = '#ff00ff'; // Magenta for temporary
                     this.fireCooldown = 2000;
@@ -416,14 +403,8 @@
 
                 this.timeUntilNextShot = 0; 
                 
-                // Use the lifespan constants
-                if (this.isMegaTurret) {
-                    this.despawnTimer = MEGA_TURRET_LIFESPAN_MS;
-                } else if (this.isTemporary) {
-                    this.despawnTimer = TURRET_LIFESPAN_MS;
-                } else {
-                    this.despawnTimer = Infinity;
-                }
+                // Use the new TURRET_LIFESPAN_MS constant
+                this.despawnTimer = isTemporary ? TURRET_LIFESPAN_MS : Infinity; 
                 this.hasFired = false;
 
                 this.minX = minX;
@@ -527,8 +508,8 @@
                     }
                 }
                 
-                // 3. Despawn Logic (for temporary and mega turrets)
-                if (this.isTemporary || this.isMegaTurret) {
+                // 3. Despawn Logic (for temporary turrets)
+                if (this.isTemporary) {
                     if (this.hasFired) {
                         this.despawnTimer -= deltaTime;
                         if (this.despawnTimer <= 0) {
@@ -569,29 +550,31 @@
             {
                 moduleWidth: 150, 
                 platforms: [
-                    [10, GAME_HEIGHT - 60, 50, 10],
-                    [10, GAME_HEIGHT - 200, 50, 10] // Added higher platform
+                    [10, GAME_HEIGHT - 60, 50, 15],
+                    [80, GAME_HEIGHT - 120, 50, 15],
+                    [20, GAME_HEIGHT - 200, 50, 15] // Added higher platform
                 ],
                 turrets: [],
                 megaTurrets: [], // Added for consistency
                 spawnPoints: [
-                    [30, GAME_HEIGHT - 70 - 25], 
-                    [30, GAME_HEIGHT - 210 - 25]
+                    [25, GAME_HEIGHT - 60 - 25], 
+                    [95, GAME_HEIGHT - 120 - 25],
+                    [35, GAME_HEIGHT - 200 - 25] // New spawn point
                 ]
             },
             // Module 2: Long platform with static downward turret (HAS TURRET)
             {
                 moduleWidth: 200,
                 platforms: [
-                    [20, GAME_HEIGHT - 120, 160, 15]
+                    [20, GAME_HEIGHT - 100, 160, 15]
                 ],
                 turrets: [
                     [100, GAME_HEIGHT - 170 - 10 - 30, Math.PI / 2]
                 ],
                 megaTurrets: [],
                 spawnPoints: [
-                    [40, GAME_HEIGHT - 135 - 25], 
-                    [160, GAME_HEIGHT - 135 - 25] 
+                    [50, GAME_HEIGHT - 100 - 25], 
+                    [150, GAME_HEIGHT - 100 - 25] 
                 ]
             },
             // Module 3: High platform with moving horizontal turret (HAS TURRET)
@@ -605,9 +588,8 @@
                 ],
                 megaTurrets: [],
                 spawnPoints: [
-                    [70, GAME_HEIGHT - 195 - 25], 
-                    [140, GAME_HEIGHT - 195 - 25],
-                    [210, GAME_HEIGHT - 195 - 25]
+                    [80, GAME_HEIGHT - 180 - 25], 
+                    [180, GAME_HEIGHT - 180 - 25]
                 ]
             },
             // Module 4: Tall vertical wall for wall jump practice (NO TURRET)
@@ -619,8 +601,8 @@
                 turrets: [],
                 megaTurrets: [],
                 spawnPoints: [
-                    [40, GAME_HEIGHT - 115 - 25], 
-                    [40, GAME_HEIGHT - 160 - 25]
+                    [50, GAME_HEIGHT - 100 - 25], 
+                    [40, GAME_HEIGHT - 200]
                 ]
             },
             // Module 5: Steep vertical platforms for upward movement 
@@ -628,14 +610,15 @@
                 moduleWidth: 150,
                 platforms: [
                     [20, GAME_HEIGHT - 150, 40, 10],   // Lower left (y=400)
-                    [40, GAME_HEIGHT - 350, 40, 10]   // Higher left (y=200)
+                    [90, GAME_HEIGHT - 250, 40, 10],   // Middle right (y=300)
+                    [20, GAME_HEIGHT - 350, 40, 10]   // Higher left (y=200)
                 ],
                 turrets: [],
                 megaTurrets: [],
                 spawnPoints: [
-                    [35, GAME_HEIGHT - 165 - 25],
-                    [105, GAME_HEIGHT - 265 - 25],
-                    [35, GAME_HEIGHT - 365 - 25]
+                    [30, GAME_HEIGHT - 150 - 25],
+                    [100, GAME_HEIGHT - 250 - 25],
+                    [30, GAME_HEIGHT - 350 - 25]
                 ]
             },
             // Module 6: High ceiling ledge with right diagonal turret
@@ -651,9 +634,8 @@
                 ],
                 megaTurrets: [],
                 spawnPoints: [
-                    [35, GAME_HEIGHT - 115 - 25],
-                    [90, GAME_HEIGHT - 395 - 25],
-                    [160, GAME_HEIGHT - 395 - 25]
+                    [30, GAME_HEIGHT - 100 - 25],
+                    [120, GAME_HEIGHT - 380 - 25]
                 ]
             },
             // Module 7: High ceiling ledge with left diagonal turret
@@ -669,9 +651,8 @@
                 ],
                 megaTurrets: [],
                 spawnPoints: [
-                    [35, GAME_HEIGHT - 115 - 25],
-                    [90, GAME_HEIGHT - 395 - 25],
-                    [160, GAME_HEIGHT - 395 - 25]
+                    [30, GAME_HEIGHT - 100 - 25],
+                    [120, GAME_HEIGHT - 380 - 25]
                 ]
             },
             // Module 8: middle horizontal platform 
@@ -683,19 +664,39 @@
                 turrets: [],
                 megaTurrets: [],
                 spawnPoints: [
-                    [105, GAME_HEIGHT - 265 - 25]
+                    [30, GAME_HEIGHT - 150 - 25],
+                    [100, GAME_HEIGHT - 250 - 25],
+                    [30, GAME_HEIGHT - 350 - 25]
                 ]
             },
-             // Module 9: midair Tall vertical wall for wall jump practice (NO TURRET)
+            // --- NEW MEGA TURRET MODULES ---
+            // Module 9: Platform with a Mega Turret firing horizontally (Left)
             {
-                moduleWidth: 50,
+                moduleWidth: 200,
                 platforms: [
-                    [30, GAME_HEIGHT - 267, 11, 50], 
+                    [20, GAME_HEIGHT - 200, 160, 15] // High platform
                 ],
                 turrets: [],
-                megaTurrets: [],
+                megaTurrets: [
+                    // Mega Turret firing left (angle Math.PI) from the right side of the platform
+                    [160, GAME_HEIGHT - 200 - 10, Math.PI, 0, 0, 0, 0, 0] 
+                ],
                 spawnPoints: [
-                    [35, GAME_HEIGHT - 242 - 25]
+                    [50, GAME_HEIGHT - 200 - 25], 
+                    [150, GAME_HEIGHT - 200 - 25]
+                ]
+            },
+            // Module 10: Ground-level Mega Turret firing diagonally up-right
+            {
+                moduleWidth: 250,
+                platforms: [],
+                turrets: [],
+                megaTurrets: [
+                    // Mega Turret firing diagonally up-right (angle -Math.PI / 4) from the ground
+                    [20, GAME_HEIGHT - GROUND_HEIGHT - 10, -Math.PI / 4, 0, 0, 0, 0, 0] 
+                ],
+                spawnPoints: [
+                    [100, GAME_HEIGHT - 250 - 25],
                 ]
             },
         ];
@@ -810,53 +811,6 @@
             }
         }
 
-        // Function to spawn a single mega turret on the wall
-        function spawnMegaTurret() {
-            // Check if we've reached the maximum number of active mega turrets
-            if (megaTurrets.length >= MAX_ACTIVE_MEGA_TURRETS) {
-                return;
-            }
-            
-            const turretWidth = 30;
-            const turretHeight = 10;
-            
-            // Boundary definitions for spawning
-            const INNER_LEFT_BOUND = WALL_THICKNESS;
-            const INNER_RIGHT_BOUND = GAME_WIDTH - WALL_THICKNESS;
-            
-            // Safe vertical range for the turret's top edge
-            const minY_Safe = WALL_THICKNESS + 10;
-            const maxY_Safe = GAME_HEIGHT - GROUND_HEIGHT - turretHeight - 10;
-            const verticalRange = maxY_Safe - minY_Safe;
-
-            // Choose wall and angle (Left or Right only)
-            const isLeftWall = Math.random() < 0.5;
-            let x, angle;
-
-            if (isLeftWall) { 
-                // Left Edge (Fires Right)
-                x = INNER_LEFT_BOUND;
-                angle = 0;
-            } else { 
-                // Right Edge (Fires Left)
-                x = INNER_RIGHT_BOUND - turretWidth;
-                angle = Math.PI;
-            }
-            
-            // Pick a random Y within the safe range
-            const y = Math.random() * verticalRange + minY_Safe;
-
-            // Create and add the mega turret (isMegaTurret = true)
-            const newMegaTurret = new Turret(
-                x, y, angle, 
-                x, x, y, y, 0, 
-                false, // Not temporary
-                true   // Is mega turret
-            );
-
-            megaTurrets.push(newMegaTurret);
-        }
-
         // Level Generation Function
         function generateLevel() {
             let currentX = 0; 
@@ -969,15 +923,32 @@
             projectiles = []; 
             // Initialize cooldown to 0 so the first batch spawns instantly on the first frame
             temporaryTurretCooldown = 0;
-            megaTurretCooldown = MEGA_TURRET_SPAWN_COOLDOWN_MS; // Start with full cooldown for mega turrets
             
             player = new Player(0, 0); 
 
             generateLevel();
+            updateTempSettingsDisplay();
+            updateMegaSettingsDisplay(); // Call new display function
             
             requestAnimationFrame(gameLoop);
         }
         
+        function updateTempSettingsDisplay() {
+            TEMP_PROJ_DISPLAY.innerHTML = `
+                Timed Laser: Speed: ${TEMP_PROJ_SPEED} | Radius: ${TEMP_PROJ_RADIUS} | Color: ${TEMP_PROJ_COLOR}<br>
+                **Lifespan: ${TURRET_LIFESPAN_MS}ms** | **Refill Cooldown: ${TEMPORARY_TURRET_SPAWN_COOLDOWN_MS}ms** | **Max Active: ${MAX_ACTIVE_TEMPORARY_TURRETS}**
+            `;
+        }
+
+        // --- NEW FUNCTION: Mega Settings Display ---
+        function updateMegaSettingsDisplay() {
+            MEGA_PROJ_DISPLAY.innerHTML = `
+                MEGA Turret: Cooldown: ${MEGA_TURRET_COOLDOWN}ms | Big Proj Speed: ${MEGA_PROJECTILE_SPEED} | Big Proj Radius: ${MEGA_PROJECTILE_RADIUS}<br>
+                **Explosion:** Count: ${MINI_PROJECTILE_COUNT} | Mini Proj Speed: ${MINI_PROJECTILE_SPEED} | Mini Proj Radius: ${MINI_PROJECTILE_RADIUS} | Color: ${MINI_PROJECTILE_COLOR}
+            `;
+        }
+        // ------------------------------------------
+
         // --- Collision and Physics Logic ---
 
         function checkPlatformCollision() {
@@ -1010,17 +981,12 @@
                     }
 
                     // 2. HORIZONTAL COLLISION (Wall Hit)
-                    const previousRight = playerBounds.right - player.vx;
-                    const previousLeft = playerBounds.left - player.vx;
-                    
-                    if (player.vx > 0 && previousRight <= pBounds.left) {
+                    if (player.vx > 0 && playerBounds.right <= pBounds.left) {
                         player.x = pBounds.left - player.width;
-                        player.vx = 0;
                         hitWallSide = 1;
                     } 
-                    else if (player.vx < 0 && previousLeft >= pBounds.right) {
+                    else if (player.vx < 0 && playerBounds.left >= pBounds.right) {
                         player.x = pBounds.right;
-                        player.vx = 0;
                         hitWallSide = -1;
                     }
 
@@ -1138,20 +1104,9 @@
                 temporaryTurretCooldown = TEMPORARY_TURRET_SPAWN_COOLDOWN_MS;
             }
 
-            // 2b. Spawn Mega Turrets on timer
-            megaTurretCooldown -= deltaTime;
-            if (megaTurretCooldown <= 0) {
-                spawnMegaTurret();
-                megaTurretCooldown = MEGA_TURRET_SPAWN_COOLDOWN_MS;
-            }
-
             // 3. Update Turrets (Normal, Temporary, and Mega)
             turrets.forEach(t => t.update(deltaTime, projectiles));
-            
-            megaTurrets = megaTurrets.filter(t => {
-                t.update(deltaTime, projectiles);
-                return !t.isDead;
-            });
+            megaTurrets.forEach(t => t.update(deltaTime, projectiles));
 
             temporaryTurrets = temporaryTurrets.filter(t => {
                 t.update(deltaTime, projectiles);
@@ -1194,10 +1149,6 @@
 
         document.addEventListener('keyup', (e) => {
             keys[e.code] = false;
-            if (e.code === 'KeyS' || e.code === 'ArrowDown') {
-                sKeyPressed = false;
-                // Don't reset sKeyPressTime here - we want to keep the timer running
-            }
         });
 
         // Initialize the game when the page loads

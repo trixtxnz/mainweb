@@ -130,6 +130,26 @@ def welcome():
 @app.route('/webcam')
 def webcam():
     return render_template('webcam.html')
+@app.route('/platform')
+def platform():
+    return render_template('platform.html')
+
+@app.route('/ptest3')
+def ptest3():
+    return render_template('ptest3.html')
+
+@app.route('/ptest2')
+def ptest2():
+    return render_template('ptest2.html')
+
+@app.route('/rtg')
+def rtg():
+    return render_template('rtg.html')
+
+@app.route('/ttg')
+def ttg():
+    return render_template('ttg.html')
+
 
 @app.route('/detect_objects', methods=['POST'])
 def detect_objects():
