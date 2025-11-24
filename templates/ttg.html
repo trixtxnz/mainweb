@@ -1053,21 +1053,28 @@
                 currentX += module.moduleWidth + Math.random() * 30 + 20; 
             }
 
-            // 3. Guaranteed Collectible Placement on the furthest valid platform (highest X)
-            let furthestSpawnPos = null;
-            let maxDistanceX = -1;
+            // 3. Guaranteed Collectible Placement on the furthest highest platform
+            let bestSpawnPos = null;
+            let maxScore = -1;
 
             if (allSpawnPoints.length > 0) {
-                // Find the spawn point with the maximum X coordinate
+                // Find the spawn point that is both furthest (highest X) and highest (lowest Y)
+                // We'll weight distance more heavily than height
                 for (const pos of allSpawnPoints) {
-                    if (pos.x > maxDistanceX) {
-                        maxDistanceX = pos.x;
-                        furthestSpawnPos = pos;
+                    // Calculate a score: distance is weighted 2x more than height
+                    // Lower Y values (higher platforms) are better, so we subtract Y from max height
+                    const distanceScore = pos.x * 2;
+                    const heightScore = (GAME_HEIGHT - pos.y);
+                    const totalScore = distanceScore + heightScore;
+                    
+                    if (totalScore > maxScore) {
+                        maxScore = totalScore;
+                        bestSpawnPos = pos;
                     }
                 }
                 
-                if (furthestSpawnPos) {
-                    collectible = new Collectible(furthestSpawnPos.x, furthestSpawnPos.y);
+                if (bestSpawnPos) {
+                    collectible = new Collectible(bestSpawnPos.x, bestSpawnPos.y);
                 } else {
                      // Fallback 1
                      collectible = new Collectible(GAME_WIDTH - WALL_THICKNESS - 30, GAME_HEIGHT - GROUND_HEIGHT - 30);
