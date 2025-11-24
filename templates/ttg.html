@@ -143,7 +143,7 @@
         let temporaryTurrets = []; 
         let megaTurrets = []; // New array for mega turrets
         let projectiles = []; 
-        let lastTime = 0;
+        let lastTime = 0; // Will be set on first frame
 
         // Temporary Turret Management
         let temporaryTurretCooldown = TEMPORARY_TURRET_SPAWN_COOLDOWN_MS; 
@@ -975,7 +975,7 @@
 
             generateLevel();
             
-            lastTime = performance.now(); // Reset lastTime to prevent speed up
+            lastTime = 0; // Reset lastTime - will be set on first frame of game loop
             requestAnimationFrame(gameLoop);
         }
         
@@ -1170,6 +1170,11 @@
         }
 
         function gameLoop(currentTime) {
+            // Prevent large deltaTime spikes on first frame after reset
+            if (lastTime === 0) {
+                lastTime = currentTime;
+            }
+            
             const deltaTime = currentTime - lastTime;
             lastTime = currentTime;
 
