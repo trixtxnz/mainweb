@@ -230,6 +230,7 @@
         let sKeyPressTime = 0; // Track when S was pressed
         const HIGH_JUMP_WINDOW = 300; // Time window in ms to press W after S for high jump
         const HIGH_JUMP_VELOCITY = -13; // Stronger jump velocity
+        let animationFrameId = null; // Track the animation frame to prevent multiple loops
 
         // Timer
         let survivalTime = 0;
@@ -253,6 +254,12 @@
 
         // --- DIFFICULTY FUNCTION ---
         function setDifficulty(difficulty) {
+            // Cancel any existing animation frame to prevent multiple loops
+            if (animationFrameId !== null) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            
             currentDifficulty = difficulty;
             const settings = DIFFICULTY_SETTINGS[difficulty];
             
@@ -1024,6 +1031,12 @@
         }
 
         function initializeGame() {
+            // Cancel any existing animation frame to prevent multiple loops
+            if (animationFrameId !== null) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            
             gameRunning = true;
             STATUS_MESSAGE.textContent = 'Active...';
             STATUS_MESSAGE.style.color = '#b2ff59';
@@ -1048,7 +1061,7 @@
 
             generateLevel();
             
-            requestAnimationFrame(gameLoop);
+            animationFrameId = requestAnimationFrame(gameLoop);
         }
         
         // --- Collision and Physics Logic ---
@@ -1241,7 +1254,7 @@
             update(deltaTime);
             draw();
 
-            requestAnimationFrame(gameLoop);
+            animationFrameId = requestAnimationFrame(gameLoop);
         }
 
         // --- Event Listeners ---
