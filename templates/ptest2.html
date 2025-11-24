@@ -137,7 +137,6 @@
 
         // Game Objects Arrays
         let platforms = [];
-        let collectible;
         let player;
         let turrets = [];          
         let temporaryTurrets = []; 
@@ -308,32 +307,6 @@
             }
         }
 
-        class Collectible {
-            // ... (Collectible class remains unchanged) ...
-            constructor(x, y) {
-                this.x = x;
-                this.y = y;
-                this.size = 20;
-                this.color = '#00ffff'; 
-                this.collected = false;
-            }
-
-            draw() {
-                if (!this.collected) {
-                    ctx.fillStyle = this.color;
-                    ctx.beginPath();
-                    ctx.moveTo(this.x + this.size / 2, this.y);
-                    ctx.lineTo(this.x + this.size, this.y + this.size / 2);
-                    ctx.lineTo(this.x + this.size / 2, this.y + this.size);
-                    ctx.lineTo(this.x, this.y + this.size / 2);
-                    ctx.closePath();
-                    ctx.fill();
-
-                    ctx.shadowBlur = 10;
-                    ctx.shadowColor = this.color;
-                }
-            }
-        }
 
         class Projectile {
             constructor(x, y, angle, speed, color, radius, isMega = false) { 
@@ -918,41 +891,7 @@
                     });
                 }
                 
-                // Save potential collectible spawn points
-                module.spawnPoints.forEach(sPoint => {
-                    if (sPoint[0] + currentX < GAME_WIDTH - WALL_THICKNESS - 10) {
-                        allSpawnPoints.push({
-                            x: sPoint[0] + currentX,
-                            y: sPoint[1]
-                        });
-                    }
-                });
-
                 currentX += module.moduleWidth + Math.random() * 30 + 20; 
-            }
-
-            // 3. Guaranteed Collectible Placement on the furthest valid platform (highest X)
-            let furthestSpawnPos = null;
-            let maxDistanceX = -1;
-
-            if (allSpawnPoints.length > 0) {
-                // Find the spawn point with the maximum X coordinate
-                for (const pos of allSpawnPoints) {
-                    if (pos.x > maxDistanceX) {
-                        maxDistanceX = pos.x;
-                        furthestSpawnPos = pos;
-                    }
-                }
-                
-                if (furthestSpawnPos) {
-                    collectible = new Collectible(furthestSpawnPos.x, furthestSpawnPos.y);
-                } else {
-                     // Fallback 1
-                     collectible = new Collectible(GAME_WIDTH - WALL_THICKNESS - 30, GAME_HEIGHT - GROUND_HEIGHT - 30);
-                }
-            } else {
-                 // Fallback 2
-                 collectible = new Collectible(GAME_WIDTH - WALL_THICKNESS - 30, GAME_HEIGHT - GROUND_HEIGHT - 30);
             }
         }
 
@@ -1082,19 +1021,6 @@
         }
 
 
-        function checkWinCondition() {
-            if (collectible.collected) return; 
-
-            const pBounds = player.getBounds();
-            
-            if (
-                pBounds.right > collectible.x && pBounds.left < collectible.x + collectible.size &&
-                pBounds.bottom > collectible.y && pBounds.top < collectible.y + collectible.size
-            ) {
-                collectible.collected = true;
-                gameOver("Congratulations! You reached the gem!", true);
-            }
-        }
 
         function gameOver(message, win = false) {
             gameRunning = false;
@@ -1121,7 +1047,6 @@
 
             projectiles.forEach(p => p.draw());
             
-            collectible.draw();
             player.draw();
         }
 
@@ -1165,7 +1090,6 @@
             // 5. Collision Checks
             checkPlatformCollision();
             checkProjectileCollision(); // Updated to handle explosions
-            checkWinCondition();
         }
 
         function gameLoop(currentTime) {
