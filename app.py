@@ -24,14 +24,26 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def load_users():
     """Load users from JSON file"""
     if os.path.exists(USERS_FILE):
-        with open(USERS_FILE, 'r') as f:
-            return json.load(f)
+        try:
+            with open(USERS_FILE, 'r') as f:
+                content = f.read().strip()
+                if not content:
+                    return {}
+                return json.loads(content)
+        except (json.JSONDecodeError, ValueError):
+            # If file is corrupted, return empty dict
+            print("Warning: users.json is corrupted, returning empty user dict")
+            return {}
     return {}
 
 def save_users(users):
     """Save users to JSON file"""
-    with open(USERS_FILE, 'w') as f:
-        json.dump(users, f, indent=2)
+    try:
+        with open(USERS_FILE, 'w') as f:
+            json.dump(users, f, indent=2)
+            f.flush()  # Ensure data is written to disk
+    except Exception as e:
+        print(f"Error saving users: {e}")
 
 def hash_password(password):
     """Simple password hashing"""
