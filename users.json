@@ -43,7 +43,7 @@
   "tri": {
     "password": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
     "gender": "male",
-    "clicks": 2911273873,
+    "clicks": 2967373873,
     "prefs": {
       "welcome_text": "Welcome to the website made by your ideas!",
       "bg_color": "#ff00ea",
@@ -51,7 +51,7 @@
       "font_size": "31",
       "bg_image": "tri_bg.webp"
     },
-    "click_bonus": 2000000,
+    "click_bonus": 2007000,
     "has_unlocked_100": true,
     "has_unlocked_1000": true,
     "has_unlocked_10000": true,
@@ -124,6 +124,91 @@
     "has_unlocked_1000": true,
     "has_unlocked_10000": true,
     "has_auto_clicker": true,
+    "prefs": {
+      "welcome_text": "Welcome to the website made by your ideas!",
+      "bg_color": "#f5f5f5",
+      "text_color": "#333333",
+      "font_size": "16",
+      "bg_image": null
+    }
+  },
+  "fred1": {
+    "password": "50e7c350587a8fad15e082db47a8f692357d220c1ab701a9e04926a6833635cc",
+    "gender": "male",
+    "clicks": 11,
+    "click_bonus": 2,
+    "has_unlocked_100": true,
+    "has_unlocked_1000": false,
+    "has_unlocked_10000": false,
+    "has_auto_clicker": false,
+    "prefs": {
+      "welcome_text": "Welcome to the website made by your ideas!",
+      "bg_color": "#f5f5f5",
+      "text_color": "#333333",
+      "font_size": "16",
+      "bg_image": null
+    }
+  },
+  "johmn_coder_man": {
+    "password": "1bda9f0aed80857d43c9329457f28b1ca29f736a0c539901e1ba16a909eb07b4",
+    "gender": "female",
+    "clicks": 122000,
+    "click_bonus": 30000,
+    "has_unlocked_100": true,
+    "has_unlocked_1000": true,
+    "has_unlocked_10000": true,
+    "has_auto_clicker": true,
+    "prefs": {
+      "welcome_text": "Welcome to the website made by your ideas!",
+      "bg_color": "#f5f5f5",
+      "text_color": "#333333",
+      "font_size": "16",
+      "bg_image": null
+    }
+  },
+  "Canadian_Rat": {
+    "password": "d74ff0ee8da3b9806b18c877dbf29bbde50b5bd8e4dad7a3a725000feb82e8f1",
+    "gender": "male",
+    "clicks": 1674070121,
+    "click_bonus": 1570015,
+    "has_unlocked_100": true,
+    "has_unlocked_1000": true,
+    "has_unlocked_10000": true,
+    "has_auto_clicker": true,
+    "prefs": {
+      "welcome_text": "Welcome to the website made by your ideas!",
+      "bg_color": "#f5f5f5",
+      "text_color": "#333333",
+      "font_size": "16",
+      "bg_image": null
+    }
+  },
+  "renderisbad_kymiira": {
+    "password": "6899f148710771b9b6479896707c0a2c17c7af724ba4d64275854aa0f91965c8",
+    "gender": "male",
+    "clicks": 0,
+    "click_bonus": 1,
+    "has_unlocked_100": false,
+    "has_unlocked_1000": false,
+    "has_unlocked_10000": false,
+    "has_auto_clicker": false,
+    "prefs": {
+      "welcome_text": "Welcome to the website made by your ideas!",
+      "bg_color": "#f5f5f5",
+      "text_color": "#333333",
+      "font_size": "16",
+      "bg_image": null
+    }
+  },
+  "renderisbad_kymiiira": {
+    "password": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+    "gender": "male",
+    "clicks": 0,
+    "click_bonus": 1,
+    "has_unlocked_100": false,
+    "has_unlocked_1000": false,
+    "has_unlocked_10000": false,
+    "has_auto_clicker": false,
     "prefs": {
       "welcome_text": "Welcome to the website made by your ideas!",
       "bg_color": "#f5f5f5",
