@@ -8,3 +8,5 @@ numpy
 opencv-python
 numpy
 opencv-python
+flask-socketio
+eventlet
