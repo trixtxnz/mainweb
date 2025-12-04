@@ -1,14 +1,25 @@
 from flask import Flask, request, render_template, redirect, url_for, flash, jsonify, session
+from flask_socketio import SocketIO, emit, join_room, leave_room
 from werkzeug.utils import secure_filename
 import json
 import os
 import hashlib
+from datetime import datetime
+import re # Added for validation
+
+# OpenCV imports are placed inside the detect_objects function
+# to avoid dependency issues if not installed globally.
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-here'  # Change this in production
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # File to store user data
 USERS_FILE = 'users.json'
+CHAT_HISTORY_FILE = 'chat_history.json'
+
+# In-memory chat storage (will also persist to file)
+chat_messages = []
 
 # File upload configuration
 UPLOAD_FOLDER = os.path.join('static', 'uploads')
@@ -20,6 +31,7 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 
 # Create upload directory if it doesn't exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
 
 def load_users():
     """Load users from JSON file"""
@@ -48,6 +60,21 @@ def save_users(users):
 def hash_password(password):
     """Simple password hashing"""
     return hashlib.sha256(password.encode()).hexdigest()
+
+def load_chat_history():
+    """Load chat history from JSON file"""
+    global chat_messages
+    if os.path.exists(CHAT_HISTORY_FILE):
+        with open(CHAT_HISTORY_FILE, 'r') as f:
+            chat_messages = json.load(f)
+    else:
+        chat_messages = []
+    return chat_messages
+
+def save_chat_history():
+    """Save chat history to JSON file"""
+    with open(CHAT_HISTORY_FILE, 'w') as f:
+        json.dump(chat_messages, f, indent=2)
 
 def allowed_file(filename):
     """Check if the file has an allowed extension"""
@@ -81,8 +108,6 @@ def get_user_prefs(username):
 
 def validate_prefs(form):
     """Validate and normalize user preferences"""
-    import re
-
     errors = []
     prefs = {}
 
@@ -131,6 +156,11 @@ def validate_prefs(form):
 
     return prefs, errors
 
+# Load chat history on startup
+load_chat_history()
+
+# --- Public Routes ---
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -142,9 +172,11 @@ def welcome():
 @app.route('/webcam')
 def webcam():
     return render_template('webcam.html')
+
 @app.route('/platform')
 def platform():
-    return render_template('platform.html')
+    username = session.get('username', 'Guest')
+    return render_template('platform.html', username=username)
 
 @app.route('/ptest3')
 def ptest3():
@@ -162,96 +194,77 @@ def rtg():
 def ttg():
     return render_template('ttg.html')
 
+@app.route('/ideas')
+def ideas():
+    return render_template('ideas.html')
 
-@app.route('/detect_objects', methods=['POST'])
-def detect_objects():
-    """Process webcam frame and detect objects using OpenCV"""
-    try:
-        import cv2
-        import numpy as np
-        import base64
+# --- User Authentication Routes ---
 
-        # Get the image data from request
-        data = request.json
-        image_data = data.get('image', '')
+@app.route('/signup', methods=['POST'])
+def signup():
+    username = request.form.get('username')
+    password = request.form.get('password')
+    gender = request.form.get('gender')
 
-        # Remove the data URL prefix
-        if ',' in image_data:
-            image_data = image_data.split(',')[1]
+    if not username or not password or not gender:
+        flash('All fields are required', 'error')
+        return redirect(url_for('index'))
 
-        # Decode base64 image
-        image_bytes = base64.b64decode(image_data)
-        nparr = np.frombuffer(image_bytes, np.uint8)
-        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    # Validate username (alphanumeric and underscores only, 3-20 chars)
+    if not re.match(r'^[a-zA-Z0-9_]{3,20}$', username):
+        flash('Username must be 3-20 characters and contain only letters, numbers, and underscores', 'error')
+        return redirect(url_for('index'))
 
-        if frame is None:
-            return jsonify({'error': 'Failed to decode image'}), 400
+    users = load_users()
 
-        # Define cascade paths (custom cascades first, then fallback to built-in)
-        cascade_configs = [
-            {'name': 'Face', 'paths': ['cascades/haarcascade_frontalface_alt2.xml', 
-                                       'cascades/face.xml',
-                                       cv2.data.haarcascades + 'haarcascade_frontalface_alt2.xml',
-                                       cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'],
-             'color': '#10b981', 'params': {'scaleFactor': 1.05, 'minNeighbors': 6, 'minSize': (50, 50)}},
-            
-            {'name': 'Hand', 'paths': ['cascades/hand.xml',
-                                       'cascades/Hand.Cascade.1.xml',
-                                       'cascades/palm.xml'],
-             'color': '#f59e0b', 'params': {'scaleFactor': 1.05, 'minNeighbors': 4, 'minSize': (40, 40)}}
-        ]
+    # Check if user already exists
+    if username in users:
+        flash('Username already exists', 'error')
+        return redirect(url_for('index'))
 
-        # Convert to grayscale and enhance image quality
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        gray = cv2.equalizeHist(gray)
-        gray = cv2.GaussianBlur(gray, (3, 3), 0)
+    # Save user data with initial clicker stats and default prefs
+    users[username] = {
+        'password': hash_password(password),
+        'gender': gender,
+        'clicks': 0,
+        'click_bonus': 1,
+        'has_unlocked_100': False,
+        'has_unlocked_1000': False,
+        'has_unlocked_10000': False,
+        'has_auto_clicker': False,
+        'prefs': get_default_prefs()
+    }
+    save_users(users)
 
-        # Prepare detection results
-        detections = []
-        
-        # Try each cascade configuration
-        for config in cascade_configs:
-            cascade = None
-            
-            # Try each path until one loads successfully
-            for path in config['paths']:
-                test_cascade = cv2.CascadeClassifier(path)
-                if not test_cascade.empty():
-                    cascade = test_cascade
-                    break
-            
-            # If cascade loaded, perform detection
-            if cascade is not None and not cascade.empty():
-                objects = cascade.detectMultiScale(
-                    gray,
-                    scaleFactor=config['params']['scaleFactor'],
-                    minNeighbors=config['params']['minNeighbors'],
-                    minSize=config['params']['minSize'],
-                    flags=cv2.CASCADE_SCALE_IMAGE
-                )
-                
-                # Add detections
-                for (x, y, w, h) in objects:
-                    detections.append({
-                        'label': config['name'],
-                        'confidence': 0.90 if config['name'] == 'Face' else 0.80,
-                        'color': config['color'],
-                        'box': {
-                            'x': int(x),
-                            'y': int(y),
-                            'width': int(w),
-                            'height': int(h)
-                        }
-                    })
+    flash('Account created successfully! You can now sign in.', 'success')
+    return redirect(url_for('welcome'))
 
-        return jsonify({
-            'detections': detections,
-            'count': len(detections)
-        })
+@app.route('/signin', methods=['POST'])
+def signin():
+    username = request.form.get('username')
+    password = request.form.get('password')
 
-    except Exception as e:
-        print(f"Detection error: {e}")
-        return jsonify({'error': str(e)}), 500
+    if not username or not password:
+        flash('Username and password are required', 'error')
+        return redirect(url_for('welcome'))
+
+    users = load_users()
+
+    # Check credentials
+    if username in users and users[username]['password'] == hash_password(password):
+        session['username'] = username
+        return redirect(url_for('website'))
+    else:
+        flash('Invalid username or password', 'error')
+        return redirect(url_for('welcome'))
+
+@app.route('/logout')
+def logout():
+    session.pop('username', None)
+    flash('You have been logged out', 'success')
+    return redirect(url_for('index'))
+
+# --- Authenticated Routes ---
 
 @app.route('/website')
 def website():
@@ -340,15 +353,124 @@ def save_settings():
                 flash('Background image uploaded successfully!', 'success')
             else:
                 flash('Invalid file type. Please upload PNG, JPG, JPEG, GIF, or WebP files.', 'error')
+        else:
+            # If no new file was uploaded, keep the current one (if not explicitly removed)
+            prefs['bg_image'] = current_bg_image
+
+    # If no file operations were performed, ensure current bg_image is retained
+    elif current_bg_image and 'bg_image' not in prefs:
+        prefs['bg_image'] = current_bg_image
 
     # Save preferences
+    if username not in users: # Safety check for concurrent operations
+        users[username] = {'prefs': {}}
     if 'prefs' not in users[username]:
         users[username]['prefs'] = {}
+
     users[username]['prefs'].update(prefs)
     save_users(users)
 
     flash('Settings saved successfully!', 'success')
     return redirect(url_for('website'))
+
+# --- OpenCV Detection Route ---
+
+@app.route('/detect_objects', methods=['POST'])
+def detect_objects():
+    """Process webcam frame and detect objects using OpenCV"""
+    try:
+        import cv2
+        import numpy as np
+        import base64
+
+        # Get the image data from request
+        data = request.json
+        image_data = data.get('image', '')
+
+        # Remove the data URL prefix
+        if ',' in image_data:
+            image_data = image_data.split(',')[1]
+
+        # Decode base64 image
+        image_bytes = base64.b64decode(image_data)
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        if frame is None:
+            return jsonify({'error': 'Failed to decode image'}), 400
+
+        # Define cascade paths (custom cascades first, then fallback to built-in)
+        cascade_configs = [
+            {'name': 'Face', 'paths': ['cascades/haarcascade_frontalface_alt2.xml',  
+                                       'cascades/face.xml',
+                                       cv2.data.haarcascades + 'haarcascade_frontalface_alt2.xml',
+                                       cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'],
+             'color': '#10b981', 'params': {'scaleFactor': 1.05, 'minNeighbors': 6, 'minSize': (50, 50)}},
+
+            {'name': 'Hand', 'paths': ['cascades/hand.xml',
+                                       'cascades/Hand.Cascade.1.xml',
+                                       'cascades/palm.xml'],
+             'color': '#f59e0b', 'params': {'scaleFactor': 1.05, 'minNeighbors': 4, 'minSize': (40, 40)}}
+        ]
+
+        # Convert to grayscale and enhance image quality
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        gray = cv2.equalizeHist(gray)
+        gray = cv2.GaussianBlur(gray, (3, 3), 0)
+
+        # Prepare detection results
+        detections = []
+
+        # Try each cascade configuration
+        for config in cascade_configs:
+            cascade = None
+
+            # Try each path until one loads successfully
+            for path in config['paths']:
+                # The path check is simplified here as we cannot reliably check file system
+                # Instead, we rely on cv2 to try to load it.
+                test_cascade = cv2.CascadeClassifier(path)
+                if not test_cascade.empty():
+                    cascade = test_cascade
+                    break
+
+            # If cascade loaded, perform detection
+            if cascade is not None and not cascade.empty():
+                objects = cascade.detectMultiScale(
+                    gray,
+                    scaleFactor=config['params']['scaleFactor'],
+                    minNeighbors=config['params']['minNeighbors'],
+                    minSize=config['params']['minSize'],
+                    flags=cv2.CASCADE_SCALE_IMAGE
+                )
+
+                # Add detections
+                for (x, y, w, h) in objects:
+                    detections.append({
+                        'label': config['name'],
+                        'confidence': 0.90 if config['name'] == 'Face' else 0.80,
+                        'color': config['color'],
+                        'box': {
+                            'x': int(x),
+                            'y': int(y),
+                            'width': int(w),
+                            'height': int(h)
+                        }
+                    })
+
+        return jsonify({
+            'detections': detections,
+            'count': len(detections)
+        })
+
+    except ImportError:
+        return jsonify({'error': 'OpenCV (cv2) not installed. Cannot perform object detection.'}), 500
+    except Exception as e:
+        print(f"Detection error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# --- Clicker Game Routes ---
 
 @app.route('/c')
 def clicker():
@@ -359,7 +481,8 @@ def clicker():
     users = load_users()
     username = session['username']
 
-    # Initialize clicks if not present (for existing users)
+    # Initialize clicks if not present (for existing users who didn't go through new signup)
+    # This ensures backward compatibility for older user data.
     if 'clicks' not in users[username]:
         users[username]['clicks'] = 0
     if 'click_bonus' not in users[username]:
@@ -380,80 +503,15 @@ def clicker():
     has_unlocked_1000 = users[username]['has_unlocked_1000']
     has_unlocked_10000 = users[username]['has_unlocked_10000']
     has_auto_clicker = users[username]['has_auto_clicker']
+
     return render_template('clicker game.html',
-                                                username=username,
-                                                clicks=current_clicks, 
-                                                click_bonus=current_bonus, 
-                                                has_unlocked_100=has_unlocked_100, 
-                                                has_unlocked_1000=has_unlocked_1000,
-                                                has_unlocked_10000=has_unlocked_10000,
-                                                has_auto_clicker=has_auto_clicker)
-
-@app.route('/signup', methods=['POST'])
-def signup():
-    username = request.form.get('username')
-    password = request.form.get('password')
-    gender = request.form.get('gender')
-
-    if not username or not password or not gender:
-        flash('All fields are required', 'error')
-        return redirect(url_for('index'))
-
-    # Validate username (alphanumeric and underscores only, 3-20 chars)
-    import re
-    if not re.match(r'^[a-zA-Z0-9_]{3,20}$', username):
-        flash('Username must be 3-20 characters and contain only letters, numbers, and underscores', 'error')
-        return redirect(url_for('index'))
-
-    users = load_users()
-
-    # Check if user already exists
-    if username in users:
-        flash('Username already exists', 'error')
-        return redirect(url_for('index'))
-
-    # Save user data
-    users[username] = {
-        'password': hash_password(password),
-        'gender': gender,
-        'clicks': 0,
-        'click_bonus': 1,
-        'has_unlocked_100': False,
-        'has_unlocked_1000': False,
-        'has_unlocked_10000': False,
-        'has_auto_clicker': False,
-        'prefs': get_default_prefs()
-    }
-    save_users(users)
-
-    flash('Account created successfully! You can now sign in.', 'success')
-    return redirect(url_for('welcome'))
-
-@app.route('/signin', methods=['POST'])
-def signin():
-    username = request.form.get('username')
-    password = request.form.get('password')
-
-    if not username or not password:
-        flash('Username and password are required', 'error')
-        return redirect(url_for('welcome'))
-
-    users = load_users()
-
-    # Check credentials
-    if username in users and users[username]['password'] == hash_password(password):
-        session['username'] = username
-        flash(f'Welcome back, {username}!', 'success')
-        return redirect(url_for('website'))
-    else:
-        flash('Invalid username or password', 'error')
-        return redirect(url_for('welcome'))
-
-@app.route('/logout')
-def logout():
-    session.pop('username', None)
-    flash('You have been logged out', 'success')
-    return redirect(url_for('index'))
+                           username=username,
+                           clicks=current_clicks,  
+                           click_bonus=current_bonus,  
+                           has_unlocked_100=has_unlocked_100,  
+                           has_unlocked_1000=has_unlocked_1000,
+                           has_unlocked_10000=has_unlocked_10000,
+                           has_auto_clicker=has_auto_clicker)
 
 @app.route('/save_click', methods=['POST'])
 def save_click():
@@ -463,7 +521,6 @@ def save_click():
     users = load_users()
     username = session['username']
 
-    # Initialize clicks and bonus if not present
     if 'clicks' not in users[username]:
         users[username]['clicks'] = 0
     if 'click_bonus' not in users[username]:
@@ -478,16 +535,13 @@ def save_click():
 
 @app.route('/spend_clicks', methods=['POST'])
 def spend_clicks():
-    # 1. Authentication Check
     if 'username' not in session:
         return jsonify({'error': 'Not logged in'}), 401
 
-    # 2. Load User Data and Get Variables
     users = load_users()
     username = session['username']
-    SPEND_AMOUNT = 10  # Must match the SPEND_AMOUNT in JavaScript
+    SPEND_AMOUNT = 10
 
-    # Initialize clicks and bonus if not present (Safety check)
     if 'clicks' not in users[username]:
         users[username]['clicks'] = 0
     if 'click_bonus' not in users[username]:
@@ -497,7 +551,6 @@ def spend_clicks():
 
     current_clicks = users[username]['clicks']
 
-    # 3. Validation Check (CRITICAL: Server is the authority)
     if current_clicks < SPEND_AMOUNT:
         return jsonify({
             'error': f'Insufficient clicks. Need {SPEND_AMOUNT}, have {current_clicks}.',
@@ -506,21 +559,11 @@ def spend_clicks():
             'has_unlocked_100': users[username]['has_unlocked_100']
         }), 400
 
-    # 4. Process the Transaction
-
-    # Decrement click count
     users[username]['clicks'] -= SPEND_AMOUNT
-
-    # Increase the click bonus (stacking effect)
     users[username]['click_bonus'] += 1
-
-    # Unlock the 100 clicks upgrade
     users[username]['has_unlocked_100'] = True
-
-    # Save the updated data
     save_users(users)
 
-    # 5. Success Response
     return jsonify({
         'clicks': users[username]['clicks'],
         'click_bonus': users[username]['click_bonus'],
@@ -529,26 +572,24 @@ def spend_clicks():
 
 @app.route('/spend_clicks_100', methods=['POST'])
 def spend_clicks_100():
-    # 1. Authentication Check
     if 'username' not in session:
         return jsonify({'error': 'Not logged in'}), 401
 
-    # 2. Load User Data and Get Variables
     users = load_users()
     username = session['username']
-    SPEND_AMOUNT = 100  # Must match the SPEND_AMOUNT_100 in JavaScript
+    SPEND_AMOUNT = 100
 
-    # Initialize clicks and bonus if not present (Safety check)
     if 'clicks' not in users[username]:
         users[username]['clicks'] = 0
     if 'click_bonus' not in users[username]:
         users[username]['click_bonus'] = 1
     if 'has_unlocked_100' not in users[username]:
         users[username]['has_unlocked_100'] = False
+    if 'has_unlocked_1000' not in users[username]:
+        users[username]['has_unlocked_1000'] = False
 
     current_clicks = users[username]['clicks']
 
-    # 3. Validation Check: Must have unlocked this upgrade first
     if not users[username]['has_unlocked_100']:
         return jsonify({
             'error': 'You must unlock this upgrade first by buying the 10 clicks upgrade.',
@@ -557,7 +598,6 @@ def spend_clicks_100():
             'has_unlocked_100': users[username]['has_unlocked_100']
         }), 403
 
-    # 4. Validation Check (CRITICAL: Server is the authority)
     if current_clicks < SPEND_AMOUNT:
         return jsonify({
             'error': f'Insufficient clicks. Need {SPEND_AMOUNT}, have {current_clicks}.',
@@ -566,21 +606,11 @@ def spend_clicks_100():
             'has_unlocked_100': users[username]['has_unlocked_100']
         }), 400
 
-    # 5. Process the Transaction
-
-    # Decrement click count
     users[username]['clicks'] -= SPEND_AMOUNT
-
-    # Increase the click bonus by 5 (bigger upgrade)
     users[username]['click_bonus'] += 10
-
-    # Unlock the 1000 clicks upgrade
     users[username]['has_unlocked_1000'] = True
-
-    # Save the updated data
     save_users(users)
 
-    # 6. Success Response
     return jsonify({
         'clicks': users[username]['clicks'],
         'click_bonus': users[username]['click_bonus'],
@@ -590,27 +620,24 @@ def spend_clicks_100():
 
 @app.route('/spend_clicks_1000', methods=['POST'])
 def spend_clicks_1000():
-    # 1. Authentication Check
     if 'username' not in session:
         return jsonify({'error': 'Not logged in'}), 401
 
-    # 2. Load User Data and Get Variables
     users = load_users()
     username = session['username']
-    SPEND_AMOUNT = 1000  # Must match the SPEND_AMOUNT_1000 in JavaScript
+    SPEND_AMOUNT = 1000
 
-    # Initialize clicks and bonus if not present (Safety check)
     if 'clicks' not in users[username]:
         users[username]['clicks'] = 0
     if 'click_bonus' not in users[username]:
         users[username]['click_bonus'] = 1
-
     if 'has_unlocked_1000' not in users[username]:
         users[username]['has_unlocked_1000'] = False
+    if 'has_unlocked_10000' not in users[username]:
+        users[username]['has_unlocked_10000'] = False
 
     current_clicks = users[username]['clicks']
 
-    # 3. Validation Check: Must have unlocked this upgrade first
     if not users[username]['has_unlocked_1000']:
         return jsonify({
             'error': 'You must unlock this upgrade first by buying the 100 clicks upgrade.',
@@ -620,7 +647,6 @@ def spend_clicks_1000():
             'has_unlocked_1000': users[username]['has_unlocked_1000']
         }), 403
 
-    # 4. Validation Check (CRITICAL: Server is the authority)
     if current_clicks < SPEND_AMOUNT:
         return jsonify({
             'error': f'Insufficient clicks. Need {SPEND_AMOUNT}, have {current_clicks}.',
@@ -630,21 +656,11 @@ def spend_clicks_1000():
             'has_unlocked_1000': users[username]['has_unlocked_1000']
         }), 400
 
-    # 5. Process the Transaction
-
-    # Decrement click count
     users[username]['clicks'] -= SPEND_AMOUNT
-
-    # Increase the click bonus by 100 (even bigger upgrade)
     users[username]['click_bonus'] += 100
-
-    # Unlock the 10000 clicks upgrade
     users[username]['has_unlocked_10000'] = True
-
-    # Save the updated data
     save_users(users)
 
-    # 6. Success Response
     return jsonify({
         'clicks': users[username]['clicks'],
         'click_bonus': users[username]['click_bonus'],
@@ -652,81 +668,66 @@ def spend_clicks_1000():
         'has_unlocked_1000': users[username]['has_unlocked_1000'],
         'has_unlocked_10000': users[username]['has_unlocked_10000']
     })
+
 @app.route('/spend_clicks_10000', methods=['POST'])
 def spend_clicks_10000():
-        # 1. Authentication Check
-        if 'username' not in session:
-            return jsonify({'error': 'Not logged in'}), 401
+    if 'username' not in session:
+        return jsonify({'error': 'Not logged in'}), 401
 
-        # 2. Load User Data and Get Variables
-        users = load_users()
-        username = session['username']
-        SPEND_AMOUNT = 10000  # Must match the SPEND_AMOUNT_10000 in JavaScript
+    users = load_users()
+    username = session['username']
+    SPEND_AMOUNT = 10000
 
-        # Initialize clicks and bonus if not present (Safety check)
-        if 'clicks' not in users[username]:
-            users[username]['clicks'] = 0
-        if 'click_bonus' not in users[username]:
-            users[username]['click_bonus'] = 1
-        if 'has_unlocked_10000' not in users[username]:
-            users[username]['has_unlocked_10000'] = False
+    if 'clicks' not in users[username]:
+        users[username]['clicks'] = 0
+    if 'click_bonus' not in users[username]:
+        users[username]['click_bonus'] = 1
+    if 'has_unlocked_10000' not in users[username]:
+        users[username]['has_unlocked_10000'] = False
 
-        current_clicks = users[username]['clicks']
+    current_clicks = users[username]['clicks']
 
-        # 3. Validation Check: Must have unlocked this upgrade first
-        if not users[username]['has_unlocked_10000']:
-            return jsonify({
-                'error': 'You must unlock this upgrade first by buying the 1000 clicks upgrade.',
-                'clicks': current_clicks,
-                'click_bonus': users[username]['click_bonus'],
-                'has_unlocked_100': users[username]['has_unlocked_100'],
-                'has_unlocked_1000': users[username]['has_unlocked_1000'],
-                'has_unlocked_10000': users[username]['has_unlocked_10000']
-            }), 403
-
-        # 4. Validation Check (CRITICAL: Server is the authority)
-        if current_clicks < SPEND_AMOUNT:
-            return jsonify({
-                'error': f'Insufficient clicks. Need {SPEND_AMOUNT}, have {current_clicks}.',
-                'clicks': current_clicks,
-                'click_bonus': users[username]['click_bonus'],
-                'has_unlocked_100': users[username]['has_unlocked_100'],
-                'has_unlocked_1000': users[username]['has_unlocked_1000'],
-                'has_unlocked_10000': users[username]['has_unlocked_10000']
-            }), 400
-
-        # 5. Process the Transaction
-
-        # Decrement click count
-        users[username]['clicks'] -= SPEND_AMOUNT
-
-        # Increase the click bonus by 1000 (massive upgrade)
-        users[username]['click_bonus'] += 1000
-
-        # Save the updated data
-        save_users(users)
-
-        # 6. Success Response
+    if not users[username]['has_unlocked_10000']:
         return jsonify({
-            'clicks': users[username]['clicks'],
+            'error': 'You must unlock this upgrade first by buying the 1000 clicks upgrade.',
+            'clicks': current_clicks,
             'click_bonus': users[username]['click_bonus'],
             'has_unlocked_100': users[username]['has_unlocked_100'],
             'has_unlocked_1000': users[username]['has_unlocked_1000'],
             'has_unlocked_10000': users[username]['has_unlocked_10000']
-        })
+        }), 403
+
+    if current_clicks < SPEND_AMOUNT:
+        return jsonify({
+            'error': f'Insufficient clicks. Need {SPEND_AMOUNT}, have {current_clicks}.',
+            'clicks': current_clicks,
+            'click_bonus': users[username]['click_bonus'],
+            'has_unlocked_100': users[username]['has_unlocked_100'],
+            'has_unlocked_1000': users[username]['has_unlocked_1000'],
+            'has_unlocked_10000': users[username]['has_unlocked_10000']
+        }), 400
+
+    users[username]['clicks'] -= SPEND_AMOUNT
+    users[username]['click_bonus'] += 1000
+    save_users(users)
+
+    return jsonify({
+        'clicks': users[username]['clicks'],
+        'click_bonus': users[username]['click_bonus'],
+        'has_unlocked_100': users[username]['has_unlocked_100'],
+        'has_unlocked_1000': users[username]['has_unlocked_1000'],
+        'has_unlocked_10000': users[username]['has_unlocked_10000']
+    })
 
 @app.route('/unlock_auto_clicker', methods=['POST'])
 def unlock_auto_clicker():
-    # 1. Authentication Check
     if 'username' not in session:
         return jsonify({'error': 'Not logged in'}), 401
 
-    # 2. Load User Data
     users = load_users()
     username = session['username']
-    SPEND_AMOUNT = 15000  # Cost to unlock auto-clicker
+    SPEND_AMOUNT = 15000
 
-    # Initialize if not present
     if 'clicks' not in users[username]:
         users[username]['clicks'] = 0
     if 'has_unlocked_10000' not in users[username]:
@@ -736,7 +737,6 @@ def unlock_auto_clicker():
 
     current_clicks = users[username]['clicks']
 
-    # 3. Validation Check: Must have unlocked the 10000 upgrade first
     if not users[username]['has_unlocked_10000']:
         return jsonify({
             'error': 'You must unlock the 10000 upgrade first.',
@@ -744,7 +744,6 @@ def unlock_auto_clicker():
             'has_auto_clicker': users[username]['has_auto_clicker']
         }), 403
 
-    # 4. Check if already unlocked
     if users[username]['has_auto_clicker']:
         return jsonify({
             'error': 'Auto-clicker already unlocked.',
@@ -752,7 +751,6 @@ def unlock_auto_clicker():
             'has_auto_clicker': True
         }), 400
 
-    # 5. Validation Check: Must have enough clicks
     if current_clicks < SPEND_AMOUNT:
         return jsonify({
             'error': f'Insufficient clicks. Need {SPEND_AMOUNT}, have {current_clicks}.',
@@ -760,19 +758,95 @@ def unlock_auto_clicker():
             'has_auto_clicker': users[username]['has_auto_clicker']
         }), 400
 
-    # 6. Deduct clicks and unlock the auto-clicker
     users[username]['clicks'] -= SPEND_AMOUNT
     users[username]['has_auto_clicker'] = True
-
-    # Save the updated data
     save_users(users)
 
-    # 7. Success Response
     return jsonify({
         'clicks': users[username]['clicks'],
         'has_auto_clicker': users[username]['has_auto_clicker']
     })
 
 
+# --- WebSocket Event Handlers for Multiplayer Chat/Platformer ---
+
+@socketio.on('connect')
+def handle_connect():
+    if 'username' in session:
+        emit('user_connected', {'username': session['username']}, broadcast=True)
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    if 'username' in session:
+        emit('user_disconnected', {'username': session['username']}, broadcast=True)
+
+@socketio.on('join_room')
+def handle_join_room(data):
+    if 'username' in session:
+        room = data.get('room', 'default')
+        # Use unified room for both website and platformer
+        unified_room = 'unified_chat' if room in ['default', 'platformer_game'] else room
+        join_room(unified_room)
+
+        # Send chat history to the newly joined user
+        emit('chat_history', {'messages': chat_messages})
+
+        emit('user_joined', {
+            'username': session['username'],
+            'room': unified_room
+        }, room=unified_room)
+
+@socketio.on('leave_room')
+def handle_leave_room(data):
+    if 'username' in session:
+        room = data.get('room', 'default')
+        # Use unified room for both website and platformer
+        unified_room = 'unified_chat' if room in ['default', 'platformer_game'] else room
+        leave_room(unified_room)
+        emit('user_left', {
+            'username': session['username'],
+            'room': unified_room
+        }, room=unified_room)
+
+@socketio.on('send_message')
+def handle_message(data):
+    if 'username' in session:
+        room = data.get('room', 'default')
+        # Use unified room for both website and platformer
+        unified_room = 'unified_chat' if room in ['default', 'platformer_game'] else room
+
+        message_data = {
+            'username': session['username'],
+            'message': data.get('message', ''),
+            'timestamp': data.get('timestamp', datetime.now().strftime('%H:%M:%S'))
+        }
+
+        # Store message in history
+        chat_messages.append(message_data)
+
+        # Keep only last 100 messages to prevent file from growing too large
+        if len(chat_messages) > 100:
+            chat_messages.pop(0)
+
+        # Save to file
+        save_chat_history()
+
+        emit('receive_message', message_data, room=unified_room)
+
+@socketio.on('user_action')
+def handle_user_action(data):
+    if 'username' in session:
+        room = data.get('room', 'default')
+        # Use unified room for platformer actions
+        unified_room = 'unified_chat' if room == 'platformer_game' else room
+
+        emit('action_update', {
+            'username': session['username'],
+            'action': data.get('action', ''),
+            'data': data.get('data', {})
+        }, room=unified_room, include_self=False)
+
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Using socketio.run instead of app.run for Flask-SocketIO apps
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)

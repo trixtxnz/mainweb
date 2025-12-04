@@ -4,10 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Retro Platformer - Randomized</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
         /* platform arrys line 566 */
         /* Custom retro/pixel font */
-        
+
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
         body {
             display: flex;
@@ -91,9 +92,118 @@
             border-color: #fff;
             box-shadow: 0 0 20px rgba(255, 195, 0, 1);
         }
+
+        /* Multiplayer Chat Overlay */
+        .chat-overlay {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            width: 300px;
+            background: rgba(13, 27, 42, 0.95);
+            border: 2px solid #ffc300;
+            border-radius: 8px;
+            padding: 10px;
+            z-index: 1000;
+            font-family: 'Press Start 2P', cursive;
+            box-shadow: 0 0 20px rgba(255, 195, 0, 0.5);
+        }
+
+        .chat-header {
+            color: #ffc300;
+            font-size: 0.7rem;
+            margin-bottom: 8px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #ffc300;
+        }
+
+        .chat-messages {
+            height: 150px;
+            overflow-y: auto;
+            margin-bottom: 8px;
+            font-size: 0.5rem;
+            color: #e0fbfc;
+        }
+
+        .chat-message {
+            margin-bottom: 5px;
+            word-wrap: break-word;
+        }
+
+        .chat-message .username {
+            color: #ff9800;
+            font-weight: bold;
+        }
+
+        .chat-message.system {
+            color: #ade8f4;
+            font-style: italic;
+        }
+
+        .chat-input-container {
+            display: flex;
+            gap: 5px;
+        }
+
+        .chat-input {
+            flex: 1;
+            background: #2b3a55;
+            border: 1px solid #ffc300;
+            color: #e0fbfc;
+            padding: 5px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.5rem;
+            border-radius: 4px;
+        }
+
+        .chat-send {
+            background: #ffc300;
+            border: none;
+            color: #0d1b2a;
+            padding: 5px 10px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.5rem;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .chat-send:hover {
+            background: #ff9800;
+        }
+
+        .online-count {
+            font-size: 0.5rem;
+            color: #48e42f;
+            margin-top: 5px;
+        }
+
+        .other-player {
+            position: absolute;
+            background: #00ffff;
+            border: 2px solid #0097FB;
+        }
+
+        .player-label {
+            position: absolute;
+            color: #00ffff;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.5rem;
+            text-shadow: 2px 2px 4px #000;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
+
+    <!-- Chat Overlay -->
+    <div class="chat-overlay">
+        <div class="chat-header">MULTIPLAYER CHAT</div>
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-input-container">
+            <input type="text" class="chat-input" id="chatInput" placeholder="Type message..." maxlength="50">
+            <button class="chat-send" onclick="sendChatMessage()">SEND</button>
+        </div>
+        <div class="online-count" id="onlineCount">Players: 1</div>
+    </div>
 
     <div class="game-info">
         <div id="status-message" style="color: #48e42f;">Use controls to reach the gem!</div>
@@ -130,12 +240,284 @@
         canvas.width = GAME_WIDTH;
         canvas.height = GAME_HEIGHT;
 
+        // Multiplayer Setup
+        const socket = io();
+        const currentUsername = "{{ session.get('username', 'Guest') }}";
+        let otherPlayers = {};
+        let playerCount = 1;
+        let playersAlive = {};
+        let isHost = false;
+        let levelSyncReceived = false;
+
+        // Join the game room
+        socket.on('connect', () => {
+            socket.emit('join_room', { room: 'platformer_game' });
+            playersAlive[currentUsername] = true;
+
+            // Request current level from host when joining
+            socket.emit('user_action', {
+                room: 'platformer_game',
+                action: 'request_level_sync',
+                data: {}
+            });
+        });
+
+        // Handle chat history
+        socket.on('chat_history', (data) => {
+            const chatMessages = document.getElementById('chatMessages');
+            chatMessages.innerHTML = ''; // Clear existing messages
+            data.messages.forEach(msg => {
+                if (msg.username === 'system') {
+                    // Don't reload system messages from history
+                } else {
+                    addChatMessage(msg.username, msg.message);
+                }
+            });
+        });
+
+        // Handle other players joining
+        socket.on('user_joined', (data) => {
+            if (data.username !== currentUsername) {
+                addChatMessage('system', `${data.username} joined the game`);
+                playerCount++;
+                playersAlive[data.username] = true;
+                updatePlayerCount();
+
+                // If we're the host, send current level seed to new player
+                if (isHost) {
+                    socket.emit('user_action', {
+                        room: 'platformer_game',
+                        action: 'level_sync',
+                        data: {
+                            seed: currentLevelSeed,
+                            difficulty: currentDifficulty
+                        }
+                    });
+                }
+            }
+        });
+
+        // Handle other players leaving
+        socket.on('user_left', (data) => {
+            if (otherPlayers[data.username]) {
+                delete otherPlayers[data.username];
+                playerCount--;
+                updatePlayerCount();
+                addChatMessage('system', `${data.username} left the game`);
+            }
+        });
+
+        // Handle player disconnection
+        socket.on('user_disconnected', (data) => {
+            if (otherPlayers[data.username]) {
+                delete otherPlayers[data.username];
+                playerCount--;
+                updatePlayerCount();
+                addChatMessage('system', `${data.username} disconnected`);
+            }
+        });
+
+        // Handle chat messages
+        socket.on('receive_message', (data) => {
+            if (data.username !== currentUsername) {
+                addChatMessage(data.username, data.message);
+            }
+        });
+
+        // Handle player position updates
+        socket.on('action_update', (data) => {
+            if (data.username === currentUsername) return;
+
+            if (data.action === 'player_move') {
+                otherPlayers[data.username] = data.data;
+            } else if (data.action === 'player_died') {
+                playersAlive[data.username] = false;
+                addChatMessage('system', `${data.username} died!`);
+                checkAllPlayersDead();
+            } else if (data.action === 'player_respawn') {
+                playersAlive[data.username] = true;
+            } else if (data.action === 'request_level_sync') {
+                // Another player is requesting the level seed
+                if (isHost) {
+                    socket.emit('user_action', {
+                        room: 'platformer_game',
+                        action: 'level_sync',
+                        data: {
+                            seed: currentLevelSeed,
+                            difficulty: currentDifficulty
+                        }
+                    });
+                }
+            } else if (data.action === 'level_sync') {
+                // Receive level seed from host
+                if (!levelSyncReceived) {
+                    levelSyncReceived = true;
+                    currentLevelSeed = data.data.seed;
+                    currentDifficulty = data.data.difficulty;
+
+                    // Update difficulty UI
+                    document.querySelectorAll('.difficulty-btn').forEach(btn => btn.classList.remove('active'));
+                    document.getElementById(`btn-${currentDifficulty}`).classList.add('active');
+
+                    // Apply difficulty settings
+                    const settings = DIFFICULTY_SETTINGS[currentDifficulty];
+                    PROJECTILE_SPEED = settings.PROJECTILE_SPEED;
+                    TEMP_PROJ_SPEED = settings.TEMP_PROJ_SPEED;
+                    MEGA_PROJECTILE_SPEED = settings.MEGA_PROJECTILE_SPEED;
+                    MINI_PROJECTILE_SPEED = settings.MINI_PROJECTILE_SPEED;
+                    TEMPORARY_TURRET_SPAWN_COOLDOWN_MS = settings.TEMPORARY_TURRET_SPAWN_COOLDOWN_MS;
+                    MAX_ACTIVE_TEMPORARY_TURRETS = settings.MAX_ACTIVE_TEMPORARY_TURRETS;
+                    MEGA_TURRET_SPAWN_COOLDOWN_MS = settings.MEGA_TURRET_SPAWN_COOLDOWN_MS;
+                    MAX_ACTIVE_MEGA_TURRETS = settings.MAX_ACTIVE_MEGA_TURRETS;
+                    TURRET_FIRE_COOLDOWN = settings.TURRET_FIRE_COOLDOWN;
+                    MEGA_TURRET_FIRE_COOLDOWN = settings.MEGA_TURRET_FIRE_COOLDOWN;
+
+                    initializeGame();
+                }
+            } else if (data.action === 'game_reset') {
+                // All players reset together
+                levelSyncReceived = true;
+                currentLevelSeed = data.data.seed;
+                currentDifficulty = data.data.difficulty;
+                playersAlive = {};
+                playersAlive[currentUsername] = true;
+                Object.keys(otherPlayers).forEach(username => {
+                    playersAlive[username] = true;
+                });
+
+                // Update difficulty UI
+                document.querySelectorAll('.difficulty-btn').forEach(btn => btn.classList.remove('active'));
+                document.getElementById(`btn-${currentDifficulty}`).classList.add('active');
+
+                // Apply difficulty settings
+                const settings = DIFFICULTY_SETTINGS[currentDifficulty];
+                PROJECTILE_SPEED = settings.PROJECTILE_SPEED;
+                TEMP_PROJ_SPEED = settings.TEMP_PROJ_SPEED;
+                MEGA_PROJECTILE_SPEED = settings.MEGA_PROJECTILE_SPEED;
+                MINI_PROJECTILE_SPEED = settings.MINI_PROJECTILE_SPEED;
+                TEMPORARY_TURRET_SPAWN_COOLDOWN_MS = settings.TEMPORARY_TURRET_SPAWN_COOLDOWN_MS;
+                MAX_ACTIVE_TEMPORARY_TURRETS = settings.MAX_ACTIVE_TEMPORARY_TURRETS;
+                MEGA_TURRET_SPAWN_COOLDOWN_MS = settings.MEGA_TURRET_SPAWN_COOLDOWN_MS;
+                MAX_ACTIVE_MEGA_TURRETS = settings.MAX_ACTIVE_MEGA_TURRETS;
+                TURRET_FIRE_COOLDOWN = settings.TURRET_FIRE_COOLDOWN;
+                MEGA_TURRET_FIRE_COOLDOWN = settings.MEGA_TURRET_FIRE_COOLDOWN;
+
+                initializeGame();
+            }
+        });
+
+        function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+
+            if (message) {
+                const timestamp = new Date().toLocaleTimeString();
+                socket.emit('send_message', {
+                    room: 'platformer_game',
+                    message: message,
+                    timestamp: timestamp
+                });
+                addChatMessage(currentUsername, message);
+                input.value = '';
+            }
+        }
+
+        function addChatMessage(username, message) {
+            const chatMessages = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = username === 'system' ? 'chat-message system' : 'chat-message';
+
+            if (username === 'system') {
+                messageDiv.textContent = message;
+            } else {
+                messageDiv.innerHTML = `<span class="username">${username}:</span> ${message}`;
+            }
+
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function updatePlayerCount() {
+            document.getElementById('onlineCount').textContent = `Players: ${playerCount}`;
+        }
+
+        function checkAllPlayersDead() {
+            const allDead = Object.values(playersAlive).every(alive => !alive);
+            if (allDead && gameRunning) {
+                gameOver("All players died! Press R to restart.", false);
+
+                // If we're the host, automatically reset after a short delay
+                if (isHost) {
+                    setTimeout(() => {
+                        currentLevelSeed = Date.now();
+
+                        // Broadcast reset to all players
+                        socket.emit('user_action', {
+                            room: 'platformer_game',
+                            action: 'game_reset',
+                            data: {
+                                seed: currentLevelSeed,
+                                difficulty: currentDifficulty
+                            }
+                        });
+
+                        // Reset alive status
+                        playersAlive = {};
+                        playersAlive[currentUsername] = true;
+                        Object.keys(otherPlayers).forEach(username => {
+                            playersAlive[username] = true;
+                        });
+
+                        initializeGame();
+                    }, 2000); // 2 second delay before auto-reset
+                }
+            }
+        }
+
+        // Send player position updates
+        function broadcastPlayerPosition() {
+            if (gameRunning && player) {
+                socket.emit('user_action', {
+                    room: 'platformer_game',
+                    action: 'player_move',
+                    data: {
+                        x: player.x,
+                        y: player.y,
+                        username: currentUsername
+                    }
+                });
+            }
+        }
+
+        // Broadcast position every 100ms
+        setInterval(broadcastPlayerPosition, 100);
+
+        // Chat input enter key handler
+        document.getElementById('chatInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendChatMessage();
+            }
+        });
+
+        // Pause movement when chat is focused
+        document.getElementById('chatInput').addEventListener('focus', () => {
+            // Clear all key states to stop movement
+            keys = {};
+            sKeyPressed = false;
+        });
+
+        // Resume movement when chat loses focus
+        document.getElementById('chatInput').addEventListener('blur', () => {
+            // Movement will resume naturally when keys are pressed again
+            keys = {};
+        });
+
         // Physics Constants
         const GRAVITY = 0.4;
         const PLAYER_MOVE_SPEED = 5;
         const JUMP_VELOCITY = -10;
         const WALL_JUMP_X_VELOCITY = 8; 
-        
+
         // --- DIFFICULTY SETTINGS ---
         const DIFFICULTY_SETTINGS = {
             easy: {
@@ -178,7 +560,8 @@
 
         // Current difficulty (default to medium)
         let currentDifficulty = 'medium';
-        
+        let currentLevelSeed = Date.now();
+
         // Current settings (start with medium)
         let PROJECTILE_SPEED = DIFFICULTY_SETTINGS.medium.PROJECTILE_SPEED;
         let TEMP_PROJ_SPEED = DIFFICULTY_SETTINGS.medium.TEMP_PROJ_SPEED;
@@ -190,16 +573,16 @@
         let MAX_ACTIVE_MEGA_TURRETS = DIFFICULTY_SETTINGS.medium.MAX_ACTIVE_MEGA_TURRETS;
         let TURRET_FIRE_COOLDOWN = DIFFICULTY_SETTINGS.medium.TURRET_FIRE_COOLDOWN;
         let MEGA_TURRET_FIRE_COOLDOWN = DIFFICULTY_SETTINGS.medium.MEGA_TURRET_FIRE_COOLDOWN;
-        
+
         // --- PERMANENT TURRET PROJECTILE SETTINGS ---
         const PROJECTILE_COLOR = '#ff4500'; 
         const PROJECTILE_RADIUS = 5;
-        
+
         // --- TEMPORARY TURRET SETTINGS ---
         const TEMP_PROJ_COLOR = '#ff8c00'; 
         const TEMP_PROJ_RADIUS = 5;    
         const TURRET_LIFESPAN_MS = 2000;
-        
+
         // --- MEGA TURRET/PROJECTILE SETTINGS ---
         const MEGA_PROJECTILE_RADIUS = 12;
         const MEGA_PROJECTILE_COLOR = '#ff0000';
@@ -236,12 +619,12 @@
 
         // Temporary Turret Management
         let temporaryTurretCooldown = TEMPORARY_TURRET_SPAWN_COOLDOWN_MS; 
-        
+
         // Mega Turret Management
         let megaTurretCooldown = MEGA_TURRET_SPAWN_COOLDOWN_MS;
-        
+
         // --- Game Objects (Classes) ---
-        
+
         class Player {
             // ... (Player class remains unchanged) ...
             constructor(x, y) {
@@ -458,7 +841,7 @@
                 ctx.shadowOffsetX = 0;
                 ctx.shadowOffsetY = 0;
             }
-        
+
             // --- NEW FUNCTION: Explosion Logic ---
             explodeIntoMiniProjectiles() {
                 const miniProjectiles = [];
@@ -500,11 +883,11 @@
                     this.color = '#7f0000'; // Dark Red for permanent
                     this.fireCooldown = TURRET_FIRE_COOLDOWN;
                 }
-                
+
                 this.isDead = false;
 
                 this.timeUntilNextShot = 0; 
-                
+
                 // Use the lifespan constants
                 if (this.isMegaTurret) {
                     this.despawnTimer = MEGA_TURRET_LIFESPAN_MS;
@@ -585,7 +968,7 @@
                         // Temporary turrets fire once
                     } else {
                         const muzzle = this.getMuzzlePosition();
-                        
+
                         let projSpeed = PROJECTILE_SPEED;
                         let projColor = PROJECTILE_COLOR;
                         let projRadius = PROJECTILE_RADIUS;
@@ -607,7 +990,7 @@
 
                         projectiles.push(new Projectile(muzzle.x, muzzle.y, this.angle, projSpeed, projColor, projRadius, isMega));
                         this.hasFired = true;
-                        
+
                         if (!this.isTemporary) {
                             this.timeUntilNextShot = this.fireCooldown; 
                         } else {
@@ -615,7 +998,7 @@
                         }
                     }
                 }
-                
+
                 // 3. Despawn Logic (for temporary and mega turrets)
                 if (this.isTemporary || this.isMegaTurret) {
                     if (this.hasFired) {
@@ -651,7 +1034,7 @@
                 ctx.shadowBlur = 0; 
             }
         }
-        
+
         // --- Level Data (Modules) ---
         const LevelModules = [
             // Module 1: Two small platforms high and low (NO TURRET) - Updated for higher platform
@@ -795,11 +1178,11 @@
             const turretWidth = 30;
             const turretHeight = 10;
             const MIN_SPACING = 30; 
-            
+
             // Boundary definitions for spawning
             const INNER_LEFT_BOUND = WALL_THICKNESS;
             const INNER_RIGHT_BOUND = GAME_WIDTH - WALL_THICKNESS;
-            
+
             // Safe vertical range for the turret's top edge (avoids the top wall and the ground)
             const minY_Safe = WALL_THICKNESS + 10;
             const maxY_Safe = GAME_HEIGHT - GROUND_HEIGHT - turretHeight - 10;
@@ -820,7 +1203,7 @@
                 x = INNER_RIGHT_BOUND - turretWidth;
                 angle = Math.PI;
             }
-            
+
             // 2. Find a non-overlapping Y position
             let y = null;
             let attempts = 0;
@@ -833,9 +1216,9 @@
                 attempts++;
                 // Pick a random Y within the safe range
                 const potentialY = Math.random() * verticalRange + minY_Safe;
-                
+
                 let isOverlapping = false;
-                
+
                 // Check against player starting location if spawning on the left wall
                 if (isLeftWall) {
                     // Check if the turret's top edge (potentialY) is too low and near the player's start Y.
@@ -854,7 +1237,7 @@
                             const newTurretBottom = potentialY + turretHeight;
                             const existingTurretTop = existingTurret.y;
                             const existingTurretBottom = existingTurret.y + existingTurret.height;
-        
+
                             // Overlap check including MIN_SPACING
                             if (newTurretTop < existingTurretBottom + MIN_SPACING && 
                                 newTurretBottom > existingTurretTop - MIN_SPACING) {
@@ -871,7 +1254,7 @@
                     break;
                 }
             } while (y === null && attempts < MAX_ATTEMPTS);
-            
+
             if (y === null) {
                 // Failed to find a spot, return null
                 return null; 
@@ -905,14 +1288,14 @@
             if (megaTurrets.length >= MAX_ACTIVE_MEGA_TURRETS) {
                 return;
             }
-            
+
             const turretWidth = 30;
             const turretHeight = 10;
-            
+
             // Boundary definitions for spawning
             const INNER_LEFT_BOUND = WALL_THICKNESS;
             const INNER_RIGHT_BOUND = GAME_WIDTH - WALL_THICKNESS;
-            
+
             // Safe vertical range for the turret's top edge
             const minY_Safe = WALL_THICKNESS + 10;
             const maxY_Safe = GAME_HEIGHT - GROUND_HEIGHT - turretHeight - 10;
@@ -931,7 +1314,7 @@
                 x = INNER_RIGHT_BOUND - turretWidth;
                 angle = Math.PI;
             }
-            
+
             // Pick a random Y within the safe range
             const y = Math.random() * verticalRange + minY_Safe;
 
@@ -946,6 +1329,15 @@
             megaTurrets.push(newMegaTurret);
         }
 
+        // Seeded random number generator for synchronized levels
+        function seededRandom(seed) {
+            let state = seed;
+            return function() {
+                state = (state * 1103515245 + 12345) & 0x7fffffff;
+                return state / 0x7fffffff;
+            };
+        }
+
         // Level Generation Function
         // --- DIFFICULTY FUNCTION ---
         function setDifficulty(difficulty) {
@@ -954,10 +1346,10 @@
                 cancelAnimationFrame(animationFrameId);
                 animationFrameId = null;
             }
-            
+
             currentDifficulty = difficulty;
             const settings = DIFFICULTY_SETTINGS[difficulty];
-            
+
             // Update all difficulty-dependent variables
             PROJECTILE_SPEED = settings.PROJECTILE_SPEED;
             TEMP_PROJ_SPEED = settings.TEMP_PROJ_SPEED;
@@ -969,13 +1361,33 @@
             MAX_ACTIVE_MEGA_TURRETS = settings.MAX_ACTIVE_MEGA_TURRETS;
             TURRET_FIRE_COOLDOWN = settings.TURRET_FIRE_COOLDOWN;
             MEGA_TURRET_FIRE_COOLDOWN = settings.MEGA_TURRET_FIRE_COOLDOWN;
-            
+
             // Update button states
             document.querySelectorAll('.difficulty-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById(`btn-${difficulty}`).classList.add('active');
-            
-            // Restart the game with new difficulty
+
+            // Restart the game with new difficulty (synced with other players)
             if (gameRunning) {
+                isHost = true;
+                currentLevelSeed = Date.now();
+
+                // Broadcast reset to all players
+                socket.emit('user_action', {
+                    room: 'platformer_game',
+                    action: 'game_reset',
+                    data: {
+                        seed: currentLevelSeed,
+                        difficulty: difficulty
+                    }
+                });
+
+                // Reset alive status
+                playersAlive = {};
+                playersAlive[currentUsername] = true;
+                Object.keys(otherPlayers).forEach(username => {
+                    playersAlive[username] = true;
+                });
+
                 initializeGame();
             }
         }
@@ -985,6 +1397,9 @@
             // Increased number of modules to fill the new, wider area and account for new vertical modules
             const numModules = 15; 
             const allSpawnPoints = []; 
+
+            // Create seeded random generator
+            const rng = seededRandom(currentLevelSeed);
 
             // 1. Initial Platforms (Ground and Walls)
             platforms.push(
@@ -997,15 +1412,15 @@
             player.x = WALL_THICKNESS + 25;
             player.y = GAME_HEIGHT - player.height - GROUND_HEIGHT - 1;
             currentX = player.x + player.width + 50; 
-            
+
             let availableModules = LevelModules; 
-            
+
             // 2. Randomly pick and place modules
             for (let i = 0; i < numModules; i++) {
                 // Stop generating if we run out of horizontal space
                 if (currentX >= GAME_WIDTH - 150) break; 
 
-                const randomIndex = Math.floor(Math.random() * availableModules.length);
+                const randomIndex = Math.floor(rng() * availableModules.length);
                 const module = availableModules[randomIndex];
 
                 // Create platforms
@@ -1016,30 +1431,30 @@
                 // Create permanent turrets
                 module.turrets.forEach(tData => {
                     const [x, y, angle, minX_offset, maxX_offset, minY_offset, maxY_offset, moveSpeed] = tData;
-                    
+
                     const minX = currentX + minX_offset;
                     const maxX = currentX + maxX_offset;
                     const minY = y + minY_offset; 
                     const maxY = y + maxY_offset;
-                    
+
                     turrets.push(new Turret(x + currentX, y, angle, minX, maxX, minY, maxY, moveSpeed, false, false));
                 });
-                
+
                 // Create MEGA turrets (NEW)
                 if (module.megaTurrets) {
                     module.megaTurrets.forEach(tData => {
                         const [x, y, angle, minX_offset, maxX_offset, minY_offset, maxY_offset, moveSpeed] = tData;
-                        
+
                         const minX = currentX + minX_offset;
                         const maxX = currentX + maxX_offset;
                         const minY = y + minY_offset; 
                         const maxY = y + maxY_offset;
-                        
+
                         // Pass true for the isMegaTurret flag
                         megaTurrets.push(new Turret(x + currentX, y, angle, minX, maxX, minY, maxY, moveSpeed, false, true));
                     });
                 }
-                
+
                 // Save potential collectible spawn points
                 module.spawnPoints.forEach(sPoint => {
                     if (sPoint[0] + currentX < GAME_WIDTH - WALL_THICKNESS - 10) {
@@ -1050,7 +1465,7 @@
                     }
                 });
 
-                currentX += module.moduleWidth + Math.random() * 30 + 20; 
+                currentX += module.moduleWidth + rng() * 30 + 20; 
             }
 
             // 3. Guaranteed Collectible Placement on the highest platform (farthest if tied)
@@ -1064,10 +1479,10 @@
                         minY = pos.y;
                     }
                 }
-                
+
                 // Find all platforms at the highest level
                 const highestPlatforms = allSpawnPoints.filter(pos => pos.y === minY);
-                
+
                 // Among the highest platforms, find the farthest one (max X)
                 let maxX = -1;
                 for (const pos of highestPlatforms) {
@@ -1076,7 +1491,7 @@
                         bestSpawnPos = pos;
                     }
                 }
-                
+
                 if (bestSpawnPos) {
                     collectible = new Collectible(bestSpawnPos.x, bestSpawnPos.y);
                 } else {
@@ -1095,7 +1510,7 @@
                 cancelAnimationFrame(animationFrameId);
                 animationFrameId = null;
             }
-            
+
             gameRunning = true;
             STATUS_MESSAGE.textContent = 'Active...';
             STATUS_MESSAGE.style.color = '#b2ff59';
@@ -1109,15 +1524,15 @@
             // Initialize cooldown to 0 so the first batch spawns instantly on the first frame
             temporaryTurretCooldown = 0;
             megaTurretCooldown = MEGA_TURRET_SPAWN_COOLDOWN_MS; // Start with full cooldown for mega turrets
-            
+
             player = new Player(0, 0); 
 
             generateLevel();
-            
+
             lastTime = 0; // Reset lastTime - will be set on first frame of game loop
             animationFrameId = requestAnimationFrame(gameLoop);
         }
-        
+
         // --- Collision and Physics Logic ---
 
         function checkPlatformCollision() {
@@ -1132,7 +1547,7 @@
                     const previousBottom = playerBounds.bottom - player.vy; 
                     const previousTop = playerBounds.top - player.vy;     
                     const y_axis_alignment = playerBounds.right > pBounds.left + 1 && playerBounds.left < pBounds.right - 1;
-                    
+
                     let hitWallSide = 0; // 1 for moving into right wall, -1 for moving into left wall
 
                     // 1. VERTICAL COLLISION (Landing or Headbump)
@@ -1152,7 +1567,7 @@
                     // 2. HORIZONTAL COLLISION (Wall Hit)
                     const previousRight = playerBounds.right - player.vx;
                     const previousLeft = playerBounds.left - player.vx;
-                    
+
                     if (player.vx > 0 && previousRight <= pBounds.left) {
                         player.x = pBounds.left - player.width;
                         player.vx = 0;
@@ -1181,14 +1596,15 @@
 
             projectiles.forEach(proj => {
                 let collision = false;
-                
+
                 // 1. Check Player Hit
                 if (
+                    gameRunning && playersAlive[currentUsername] &&
                     proj.x + proj.radius > player.x && proj.x - proj.radius < player.x + player.width &&
                     proj.y + proj.radius > player.y && proj.y - proj.radius < player.y + player.height
                 ) {
                     collision = true;
-                    if (gameRunning) gameOver("You were hit by a projectile! Try again.");
+                    gameOver("You were hit by a projectile! Try again.");
                 }
 
                 // 2. Check Platform Hit (Triggers explosion for MegaProjectile)
@@ -1196,13 +1612,13 @@
                     // Simple AABB check - approximate with a circle for simplicity
                     const closestX = Math.max(p.x, Math.min(proj.x, p.x + p.width));
                     const closestY = Math.max(p.y, Math.min(proj.y, p.y + p.height));
-                    
+
                     const dx = proj.x - closestX;
                     const dy = proj.y - closestY;
-                    
+
                     if ((dx * dx + dy * dy) < (proj.radius * proj.radius)) {
                         collision = true;
-                        
+
                         // --- MEGA PROJECTILE EXPLOSION LOGIC ---
                         if (proj.isMega) {
                             // Add the newly created mini projectiles to the main list
@@ -1226,7 +1642,7 @@
             if (collectible.collected) return; 
 
             const pBounds = player.getBounds();
-            
+
             if (
                 pBounds.right > collectible.x && pBounds.left < collectible.x + collectible.size &&
                 pBounds.bottom > collectible.y && pBounds.top < collectible.y + collectible.size
@@ -1237,11 +1653,24 @@
         }
 
         function gameOver(message, win = false) {
+            // Stop the game first
             gameRunning = false;
             STATUS_MESSAGE.textContent = message;
             STATUS_MESSAGE.style.color = win ? '#00ffff' : '#ff4500';
+
+            if (!win && playersAlive[currentUsername]) {
+                // Broadcast death to other players
+                playersAlive[currentUsername] = false;
+                socket.emit('user_action', {
+                    room: 'platformer_game',
+                    action: 'player_died',
+                    data: {}
+                });
+                checkAllPlayersDead();
+            }
+
             // Stop all projectiles for a clean game over screen
-            projectiles = []; 
+            projectiles = [];
         }
 
         // --- Game Loop ---
@@ -1252,17 +1681,34 @@
             ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
             ctx.shadowBlur = 0; 
-            
+
             platforms.forEach(p => p.draw());
-            
+
             turrets.forEach(t => t.draw());
             temporaryTurrets.forEach(t => t.draw());
             megaTurrets.forEach(t => t.draw()); // Draw mega turrets
 
             projectiles.forEach(p => p.draw());
-            
+
             collectible.draw();
             player.draw();
+
+            // Draw other players
+            Object.keys(otherPlayers).forEach(username => {
+                const otherPlayer = otherPlayers[username];
+                if (otherPlayer && otherPlayer.x !== undefined && otherPlayer.y !== undefined) {
+                    // Draw other player
+                    ctx.fillStyle = '#00ffff';
+                    ctx.fillRect(otherPlayer.x, otherPlayer.y, 25, 25);
+
+                    // Draw username label above player
+                    ctx.fillStyle = '#00ffff';
+                    ctx.font = '8px "Press Start 2P"';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(username, otherPlayer.x + 12.5, otherPlayer.y - 5);
+                    ctx.textAlign = 'left';
+                }
+            });
         }
 
         function update(deltaTime) {
@@ -1287,7 +1733,7 @@
 
             // 3. Update Turrets (Normal, Temporary, and Mega)
             turrets.forEach(t => t.update(deltaTime, projectiles));
-            
+
             megaTurrets = megaTurrets.filter(t => {
                 t.update(deltaTime, projectiles);
                 return !t.isDead;
@@ -1297,7 +1743,7 @@
                 t.update(deltaTime, projectiles);
                 return !t.isDead;
             });
-            
+
             // 4. Update Projectiles
             projectiles.forEach(p => p.update());
             projectiles = projectiles.filter(p => !p.isDead);
@@ -1315,7 +1761,7 @@
                 requestAnimationFrame(gameLoop);
                 return; // Skip this frame to properly initialize timing
             }
-            
+
             const deltaTime = currentTime - lastTime;
             lastTime = currentTime;
 
@@ -1328,27 +1774,70 @@
         // --- Event Listeners ---
 
         document.addEventListener('keydown', (e) => {
+            // Don't process game keys if chat input is focused
+            if (document.activeElement.id === 'chatInput') {
+                return;
+            }
+
             keys[e.code] = true;
             if ((e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') && gameRunning) {
                 e.preventDefault();
                 player.jump();
             }
-            if (e.code === 'KeyR') {
-                e.preventDefault();
-                initializeGame();
-            }
+
         });
 
         document.addEventListener('keyup', (e) => {
+            // Don't process game keys if chat input is focused
+            if (document.activeElement.id === 'chatInput') {
+                return;
+            }
+
             keys[e.code] = false;
             if (e.code === 'KeyS' || e.code === 'ArrowDown') {
                 sKeyPressed = false;
                 // Don't reset sKeyPressTime here - we want to keep the timer running
             }
+            if (e.code === 'KeyR') {
+                // Only allow manual reset if we're the host or if game is already running
+                if (isHost || gameRunning) {
+                    isHost = true;
+                    currentLevelSeed = Date.now();
+
+                    // Broadcast reset to all players
+                    socket.emit('user_action', {
+                        room: 'platformer_game',
+                        action: 'game_reset',
+                        data: {
+                            seed: currentLevelSeed,
+                            difficulty: currentDifficulty
+                        }
+                    });
+
+                    // Reset alive status
+                    playersAlive = {};
+                    playersAlive[currentUsername] = true;
+                    Object.keys(otherPlayers).forEach(username => {
+                        playersAlive[username] = true;
+                    });
+
+                    initializeGame();
+                }
+            }
         });
 
         // Initialize the game when the page loads
-        initializeGame();
+        // Wait a moment to see if we receive a level sync from an existing host
+        setTimeout(() => {
+            if (!levelSyncReceived) {
+                // We're the first player, become the host
+                isHost = true;
+                levelSyncReceived = true;
+                currentLevelSeed = Date.now();
+                playersAlive[currentUsername] = true;
+                initializeGame();
+            }
+        }, 500);
     </script>
 </body>
 </html>  

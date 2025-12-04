@@ -152,8 +152,8 @@
   "johmn_coder_man": {
     "password": "1bda9f0aed80857d43c9329457f28b1ca29f736a0c539901e1ba16a909eb07b4",
     "gender": "female",
-    "clicks": 122000,
-    "click_bonus": 30000,
+    "clicks": 4527000,
+    "click_bonus": 154000,
     "has_unlocked_100": true,
     "has_unlocked_1000": true,
     "has_unlocked_10000": true,
@@ -203,6 +203,23 @@
   "renderisbad_kymiiira": {
     "password": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
     "gender": "male",
+    "clicks": 1593802704,
+    "click_bonus": 1266222,
+    "has_unlocked_100": true,
+    "has_unlocked_1000": true,
+    "has_unlocked_10000": true,
+    "has_auto_clicker": true,
+    "prefs": {
+      "welcome_text": "no",
+      "bg_color": "#000000",
+      "text_color": "#ff0000",
+      "font_size": "16",
+      "bg_image": "renderisbad_kymiiira_bg.png"
+    }
+  },
+  "gay": {
+    "password": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+    "gender": "male",
     "clicks": 0,
     "click_bonus": 1,
     "has_unlocked_100": false,
@@ -215,6 +232,40 @@
       "text_color": "#333333",
       "font_size": "16",
       "bg_image": null
+    }
+  },
+  "Kymiira1234": {
+    "password": "ddc593668213b23347a8e1d2c7a24b957bd27e65454b3ee627ff67e95057ba8c",
+    "gender": "male",
+    "clicks": 0,
+    "click_bonus": 1,
+    "has_unlocked_100": false,
+    "has_unlocked_1000": false,
+    "has_unlocked_10000": false,
+    "has_auto_clicker": false,
+    "prefs": {
+      "welcome_text": "Welcome to the website made by your ideas!",
+      "bg_color": "#ffffff",
+      "text_color": "#ffffff",
+      "font_size": "16",
+      "bg_image": "Kymiira1234_bg.png"
+    }
+  },
+  "test_account": {
+    "password": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+    "gender": "male",
+    "clicks": 0,
+    "click_bonus": 1,
+    "has_unlocked_100": false,
+    "has_unlocked_1000": false,
+    "has_unlocked_10000": false,
+    "has_auto_clicker": false,
+    "prefs": {
+      "welcome_text": "this is the test account",
+      "bg_color": "#f5f5f5",
+      "text_color": "#eb0000",
+      "font_size": "20",
+      "bg_image": "tri_bg.webp"
     }
   }
 }

@@ -1,11 +1,12 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Website</title>
+    <title>Website - Unified</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
+        /* General styles with personalized user preferences (from first file) */
         body {
             font-family: Arial, sans-serif;
             margin: 20px;
@@ -34,19 +35,245 @@
         a:hover {
             color: #0056b3;
         }
+        /* Multiplayer-specific styles (from second file) */
+        .multiplayer-container {
+            display: flex;
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .online-users, .chat-container {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .online-users {
+            flex: 1;
+        }
+        .chat-container {
+            flex: 2;
+        }
+        .chat-messages {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .message .username {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .message .timestamp {
+            font-size: 0.8em;
+            color: #666;
+        }
+        .message-input {
+            display: flex;
+            gap: 10px;
+        }
+        .message-input input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .message-input button {
+            padding: 8px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .message-input button:hover {
+            background: #0056b3;
+        }
+        .user-list {
+            list-style: none;
+            padding: 0;
+        }
+        .user-list li {
+            padding: 8px;
+            margin-bottom: 5px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #28a745;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
     </style>
 </head>
 <body>
     <h1>Welcome {{ username }}!</h1>
     <p>{{ prefs.welcome_text }}</p>
+    <p>Interact with other users in real-time below.</p>
+
     <a href="{{ url_for('settings') }}">Settings</a>
-    <a href="{{ url_for('welcome') }}">Back to sign in</a>
-    <a href="{{ url_for('clicker') }}">clicker game</a>
-    <a href="{{ url_for('webcam') }}">webcam</a>
-    <a href="{{ url_for('platform') }}"></a>
-    <a href="{{ url_for('ptest3') }}"></a>
-    <a href="{{ url_for('ptest2') }}">survival platform</a>
-    <a href="{{ url_for('rtg') }}"></a>
-    <a href="{{ url_for('ttg') }}">platform</a>
+    <a href="{{ url_for('welcome') }}">Back to sign in/Home</a>
+    <a href="{{ url_for('logout') }}">Logout</a>
+    <a href="{{ url_for('clicker') }}">Clicker Game</a>
+    <a href="{{ url_for('webcam') }}">Webcam</a>
+    <a href="{{ url_for('platform') }}">Platform single player</a>
+    <a href="{{ url_for('ptest2') }}">Survival Platform single player</a>
+    <a href="{{ url_for('ttg') }}">Platform multi player</a>
+    <a href="{{ url_for('ideas') }}">Ideas for Website (Not done yet)</a>
+
+    <div class="multiplayer-container">
+        <div class="online-users">
+            <h3>Online Users</h3>
+            <ul class="user-list" id="userList">
+                <li><span class="status-indicator"></span>{{ username }} (You)</li>
+            </ul>
+        </div>
+
+        <div class="chat-container">
+            <h3>Chat Room</h3>
+            <div class="chat-messages" id="chatMessages"></div>
+            <div class="message-input">
+                <input type="text" id="messageInput" placeholder="Type a message..." />
+                <button onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        const currentUsername = "{{ username }}";
+        // Initialize with current user to ensure " (You)" label is correct
+        const onlineUsers = new Set([currentUsername]);
+
+        // Join the unified chat room
+        socket.on('connect', () => {
+            // Note: I'm using 'default' as per the client-side code in the second file, 
+            // but the server logic in app.py suggests 'unified_chat' might be the target.
+            // Assuming 'default' is the correct room name for this page.
+            socket.emit('join_room', { room: 'default' }); 
+        });
+
+        // Handle chat history
+        socket.on('chat_history', (data) => {
+            const chatMessages = document.getElementById('chatMessages');
+            chatMessages.innerHTML = ''; // Clear existing messages
+            data.messages.forEach(msg => {
+                addMessage(msg.username, msg.message, msg.timestamp);
+            });
+        });
+
+        // Handle user joined
+        socket.on('user_joined', (data) => {
+            if (data.username !== currentUsername) {
+                onlineUsers.add(data.username);
+                updateUserList();
+                addSystemMessage(`${data.username} joined the room`);
+            }
+        });
+
+        // Handle user left
+        socket.on('user_left', (data) => {
+            onlineUsers.delete(data.username);
+            updateUserList();
+            addSystemMessage(`${data.username} left the room`);
+        });
+
+        // Handle user connected (for initial user list population)
+        socket.on('user_connected', (data) => {
+            if (data.username !== currentUsername) {
+                onlineUsers.add(data.username);
+                updateUserList();
+            }
+        });
+
+        // Handle user disconnected
+        socket.on('user_disconnected', (data) => {
+            onlineUsers.delete(data.username);
+            updateUserList();
+            addSystemMessage(`${data.username} disconnected`);
+        });
+
+        // Handle incoming messages
+        socket.on('receive_message', (data) => {
+            addMessage(data.username, data.message, data.timestamp);
+        });
+
+        function updateUserList() {
+            const userList = document.getElementById('userList');
+            userList.innerHTML = '';
+
+            // Sort users to put 'You' at the top
+            const sortedUsers = Array.from(onlineUsers).sort((a, b) => {
+                if (a === currentUsername) return -1;
+                if (b === currentUsername) return 1;
+                return a.localeCompare(b);
+            });
+
+            sortedUsers.forEach(username => {
+                const li = document.createElement('li');
+                li.innerHTML = `<span class="status-indicator"></span>${username}${username === currentUsername ? ' (You)' : ''}`;
+                userList.appendChild(li);
+            });
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+
+            if (message) {
+                // Server should handle timestamp generation, but keeping client-side generation as it was in the original code for compatibility
+                const timestamp = new Date().toLocaleTimeString(); 
+                socket.emit('send_message', {
+                    room: 'default',
+                    message: message,
+                    timestamp: timestamp
+                });
+                input.value = '';
+            }
+        }
+
+        function addMessage(username, message, timestamp) {
+            const chatMessages = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.innerHTML = `
+                <span class="username">${username}</span>
+                <span class="timestamp">${timestamp}</span>
+                <div>${message}</div>
+            `;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function addSystemMessage(message) {
+            const chatMessages = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.style.backgroundColor = '#e7f3ff';
+            messageDiv.innerHTML = `<em>${message}</em>`;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Handle Enter key in message input
+        document.getElementById('messageInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Ensure initial user list is generated on load
+        updateUserList();
+    </script>
 </body>
 </html>
